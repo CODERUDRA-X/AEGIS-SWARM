@@ -4,8 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 /* ── Types ──────────────────────────────────────────────────────────── */
 
-type AgentName = "SCOUT" | "RISK" | "CRITIC" | "CMD";
-type Highlight  = "override" | "warn" | "cmd" | "normal";
+type AgentName = "SCOUT" | "RISK" | "CRITIC" | "CMD" | "MCP";
+type Highlight  = "override" | "warn" | "cmd" | "normal" | "mcp";
 
 interface LogEntry {
   ts:        string;
@@ -21,6 +21,12 @@ interface ReportData {
     environment_type: string;
     hazard_factors:   string[];
   };
+  mcp_data?: {
+    source: string;
+    temperature: string;
+    wind_speed: string;
+    mcp_status: string;
+  };
   risk_assessment:  { threat_level: string };
   critic_review:    { adjusted_threat_level: string; critic_reasoning: string };
   commander_plan:   { immediate_actions: string[] };
@@ -30,39 +36,35 @@ interface ReportData {
 
 const AGENT_STYLES: Record<AgentName, { border: string; text: string; bg: string }> = {
   SCOUT:  { border: "#58a6ff", text: "#58a6ff", bg: "rgba(88,166,255,0.09)"   },
+  MCP:    { border: "#00d2ff", text: "#00d2ff", bg: "rgba(0,210,255,0.09)"    }, // New MCP Agent Style
   RISK:   { border: "#3fb950", text: "#3fb950", bg: "rgba(63,185,80,0.09)"    },
   CRITIC: { border: "#f85149", text: "#f85149", bg: "rgba(248,81,73,0.13)"    },
   CMD:    { border: "#a371f7", text: "#a371f7", bg: "rgba(163,113,247,0.09)"  },
 };
 
-const LOG_DATA: LogEntry[] = [
-  { ts:"14:21:58", agent:"SCOUT",  highlight:"normal",   msg:"Detected 0 civilians, 4+ vehicles. Highway interchange." },
-  { ts:"14:21:59", agent:"SCOUT",  highlight:"normal",   msg:"Terrain: urban highway. Hazards: merging lanes, large vehicles." },
-  { ts:"14:22:01", agent:"RISK",   highlight:"normal",   msg:"People count = 0. Baseline threat: LOW. Confidence: 0.72." },
-  { ts:"14:22:02", agent:"RISK",   highlight:"normal",   msg:"Open ground assumption applied. No crowd density trigger." },
-  { ts:"14:22:04", agent:"CRITIC", highlight:"warn",     msg:"Challenging Risk. Highway environment type unaccounted in baseline." },
-  { ts:"14:22:05", agent:"CRITIC", highlight:"override", msg:"OVERRIDE: LOW → CRITICAL. Heavy traffic + collision risk = 1.8× multiplier." },
-  { ts:"14:22:06", agent:"RISK",   highlight:"normal",   msg:"Accepting Critic override. Revised assessment: CRITICAL." },
-  { ts:"14:22:07", agent:"CMD",    highlight:"cmd",      msg:"Consensus received. Generating 3-step response plan…" },
-];
-
-const REPORT: ReportData = {
+const INITIAL_REPORT: ReportData = {
   scout_data: {
     people_count:     0,
-    blocked_paths:    5,
-    environment_type: "highway and road interchange",
-    hazard_factors:   ["heavy traffic congestion","merging lanes","large vehicles","collision risk","limited visibility"],
+    blocked_paths:    0,
+    environment_type: "AWAITING FEED...",
+    hazard_factors:   [],
   },
-  risk_assessment:  { threat_level: "LOW" },
+  mcp_data: {
+    source: "OFFLINE",
+    temperature: "--",
+    wind_speed: "--",
+    mcp_status: "Standby",
+  },
+  risk_assessment:  { threat_level: "STANDBY" },
   critic_review: {
-    adjusted_threat_level: "CRITICAL",
-    critic_reasoning: "Environment type 'highway' and 'heavy traffic' create severe collision risks even with zero pedestrian count. Risk agent's open-ground assumption was incorrect.",
+    adjusted_threat_level: "STANDBY",
+    critic_reasoning: "System idle. Awaiting visual telemetry to initiate swarm pipeline.",
   },
   commander_plan: {
     immediate_actions: [
-      "Deploy traffic control personnel at all entry points to prevent unauthorized pedestrian access.",
-      "Establish safe zones off active roadways for any stranded individuals.",
-      "Utilize public address systems to broadcast urgent safety warnings.",
+      "Upload aerial or CCTV feed to initialize.",
+      "Standby for agent routing...",
+      "Maintain perimeter.",
     ],
   },
 };
@@ -125,13 +127,14 @@ function DebateLog({ entries }: { entries: LogEntry[] }) {
     if (h === "override") return "#f85149";
     if (h === "warn")     return "#e2936a";
     if (h === "cmd")      return "#a371f7";
+    if (h === "mcp")      return "#00d2ff";
     return "#5a7a90";
   };
 
   return (
     <div ref={ref} style={{ flex:1, overflowY:"auto", paddingRight:"4px", fontSize:"10px" }}>
       {entries.filter(Boolean).map((entry, i) => (
-        <div key={i} style={{ display:"grid", gridTemplateColumns:"52px 46px 1fr", gap:"8px", marginBottom:"10px", animation:"logIn 0.25s ease" }}>
+        <div key={i} style={{ display:"grid", gridTemplateColumns:"52px 46px 1fr", gap:"2px", marginBottom:"10px", animation:"logIn 0.25s ease" }}>
           <span style={{ color:"#1e3a52", paddingTop:"2px", fontFamily:"monospace" }}>{entry.ts}</span>
           <AgentBadge agent={entry.agent} />
           <span style={{ lineHeight:1.6, color:msgColor(entry.highlight), fontWeight: entry.highlight==="override" ? 600 : 400 }}>
@@ -151,7 +154,7 @@ function DebateLog({ entries }: { entries: LogEntry[] }) {
 
 /* ── SwarmTopology ───────────────────────────────────────────────────── */
 
-function SwarmTopology() {
+function SwarmTopology({ activeAgent }: { activeAgent: string | null }) {
   return (
     <svg viewBox="0 0 260 210" xmlns="http://www.w3.org/2000/svg" style={{ width:"100%", height:"100%" }}>
       <defs>
@@ -171,32 +174,32 @@ function SwarmTopology() {
 
       {/* animated debate edge */}
       <line x1="72" y1="108" x2="188" y2="108"
-        stroke="#f85149" strokeWidth="1.5" opacity="0.7"
+        stroke="#f85149" strokeWidth="1.5" opacity={activeAgent === 'CRITIC' ? 0.9 : 0.3}
         strokeDasharray="6 4"
         markerEnd="url(#a2)" markerStart="url(#a2)"
-        style={{ animation:"debateDash 1s linear infinite" }}
+        style={activeAgent === 'CRITIC' ? { animation:"debateDash 1s linear infinite" } : {}}
       />
-      <text x="130" y="103" fill="#7a2020" fontSize="7" textAnchor="middle" letterSpacing="2" fontFamily="monospace">DEBATE</text>
+      <text x="130" y="103" fill={activeAgent === 'CRITIC' ? "#f85149" : "#7a2020"} fontSize="7" textAnchor="middle" letterSpacing="2" fontFamily="monospace">DEBATE</text>
 
       {/* SCOUT */}
-      <rect x="90" y="14" width="80" height="32" rx="3" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="0.7"/>
+      <rect x="90" y="14" width="80" height="32" rx="3" fill="rgba(88,166,255,0.06)" stroke={activeAgent === 'SCOUT' ? "#ffffff" : "#58a6ff"} strokeWidth={activeAgent === 'SCOUT' ? "1.5" : "0.7"}/>
       <text x="130" y="27" textAnchor="middle" fill="#58a6ff" fontSize="9" fontWeight="500" letterSpacing="1.5" fontFamily="monospace">SCOUT</text>
-      <text x="130" y="40" textAnchor="middle" fill="#2a6a8a" fontSize="7" letterSpacing="1" fontFamily="monospace">DONE ✓</text>
+      <text x="130" y="40" textAnchor="middle" fill="#2a6a8a" fontSize="7" letterSpacing="1" fontFamily="monospace">{activeAgent ? 'ACTIVE ●' : 'DONE ✓'}</text>
 
       {/* RISK */}
       <rect x="14" y="90" width="76" height="32" rx="3" fill="rgba(63,185,80,0.04)" stroke="#3fb950" strokeWidth="0.7"/>
       <text x="52" y="103" textAnchor="middle" fill="#3fb950" fontSize="9" fontWeight="500" letterSpacing="1.5" fontFamily="monospace">RISK</text>
-      <text x="52" y="116" textAnchor="middle" fill="#2a5a2a" fontSize="7" letterSpacing="1" fontFamily="monospace">LOW→CRIT</text>
+      <text x="52" y="116" textAnchor="middle" fill="#2a5a2a" fontSize="7" letterSpacing="1" fontFamily="monospace">PIPELINE</text>
 
-      {/* CRITIC — active, glowing */}
+      {/* CRITIC */}
       <rect x="170" y="90" width="76" height="32" rx="3" fill="rgba(248,81,73,0.08)" stroke="#f85149" strokeWidth="1"
-        style={{ filter:"drop-shadow(0 0 6px rgba(248,81,73,0.3))" }}/>
+        style={activeAgent === 'CRITIC' ? { filter:"drop-shadow(0 0 6px rgba(248,81,73,0.3))" } : {}}/>
       <text x="208" y="103" textAnchor="middle" fill="#f85149" fontSize="9" fontWeight="500" letterSpacing="1.5" fontFamily="monospace">CRITIC</text>
-      <text x="208" y="116" textAnchor="middle" fill="#9a2020" fontSize="7" letterSpacing="1" fontFamily="monospace">ACTIVE ●</text>
+      <text x="208" y="116" textAnchor="middle" fill="#9a2020" fontSize="7" letterSpacing="1" fontFamily="monospace">{activeAgent === 'CRITIC' ? 'ACTIVE ●' : 'STANDBY'}</text>
 
-      {/* COMMANDER — pending */}
-      <rect x="90" y="162" width="80" height="32" rx="3" fill="#060f1a" stroke="#1e2a38" strokeWidth="0.5"/>
-      <text x="130" y="175" textAnchor="middle" fill="#2a3a4a" fontSize="9" letterSpacing="1.5" fontFamily="monospace">COMMAND</text>
+      {/* COMMANDER */}
+      <rect x="90" y="162" width="80" height="32" rx="3" fill="#060f1a" stroke={activeAgent === 'CMD' ? "#a371f7" : "#1e2a38"} strokeWidth="0.5"/>
+      <text x="130" y="175" textAnchor="middle" fill={activeAgent === 'CMD' ? "#a371f7" : "#2a3a4a"} fontSize="9" letterSpacing="1.5" fontFamily="monospace">COMMAND</text>
       <text x="130" y="188" textAnchor="middle" fill="#1a2a3a" fontSize="7" letterSpacing="1" fontFamily="monospace">PENDING…</text>
     </svg>
   );
@@ -291,20 +294,10 @@ export default function AegisDashboard() {
   const [analyzing, setAn]    = useState(false);
   const [frame, setFrame]     = useState(47);
   const [logEntries, setLog]  = useState<LogEntry[]>([]);
-
-  /* animate log entries one-by-one */
-  useEffect(() => {
-    let i = 0;
-    const id = setInterval(() => {
-      if (i < LOG_DATA.length) {
-        setLog(prev => [...prev, LOG_DATA[i]]);
-        i++;
-      } else {
-        clearInterval(id);
-      }
-    }, 420);
-    return () => clearInterval(id);
-  }, []);
+  
+  // Real dynamic report state
+  const [report, setReport]   = useState<ReportData>(INITIAL_REPORT);
+  const [activeAgent, setActiveAgent] = useState<string | null>(null);
 
   /* frame counter */
   useEffect(() => {
@@ -312,14 +305,79 @@ export default function AegisDashboard() {
     return () => clearInterval(id);
   }, []);
 
-  const handleUpload = useCallback((file: File) => {
+  const getLogTimestamp = () => {
+    const d = new Date();
+    return `${String(d.getUTCHours()).padStart(2,"0")}:${String(d.getUTCMinutes()).padStart(2,"0")}:${String(d.getUTCSeconds()).padStart(2,"0")}`;
+  };
+
+  // REAL API UPLOAD LOGIC
+  const handleUpload = useCallback(async (file: File) => {
     setSrc(URL.createObjectURL(file));
     setAn(true);
-    setTimeout(() => setAn(false), 3000);
+    setReport(INITIAL_REPORT);
+    setLog([]);
+    setActiveAgent('SCOUT');
+
+    setLog([{ ts: getLogTimestamp(), agent: "SCOUT", highlight: "normal", msg: `Uplink established. Analyzing: ${file.name}...` }]);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("http://localhost:8000/api/analyze", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      
+      if (data.error) throw new Error(data.error);
+      
+      setReport(data as ReportData);
+
+      // Create a dynamic sequence of logs based on the real data
+      const dynamicLogs: LogEntry[] = [
+        { ts: getLogTimestamp(), agent: "SCOUT", highlight: "normal", msg: `Extraction complete. Terrain: ${data.scout_data.environment_type}. Detected ${data.scout_data.people_count} entities.` },
+        { ts: getLogTimestamp(), agent: "MCP", highlight: "mcp", msg: `Tool Invoked: Live Telemetry. Temp: ${data.mcp_data?.temperature}, Wind: ${data.mcp_data?.wind_speed}.` },
+        { ts: getLogTimestamp(), agent: "RISK", highlight: "normal", msg: `Base threat evaluated: ${data.risk_assessment.threat_level}.` }
+      ];
+
+      if (data.critic_review.adjusted_threat_level !== data.risk_assessment.threat_level) {
+        dynamicLogs.push({ ts: getLogTimestamp(), agent: "CRITIC", highlight: "warn", msg: "Challenging baseline assumption using MCP & Visual data." });
+        dynamicLogs.push({ ts: getLogTimestamp(), agent: "CRITIC", highlight: "override", msg: `OVERRIDE: ${data.risk_assessment.threat_level} → ${data.critic_review.adjusted_threat_level}.` });
+      } else {
+        dynamicLogs.push({ ts: getLogTimestamp(), agent: "CRITIC", highlight: "normal", msg: `Concur with Risk Assessment: ${data.risk_assessment.threat_level}.` });
+      }
+
+      dynamicLogs.push({ ts: getLogTimestamp(), agent: "CMD", highlight: "cmd", msg: "Consensus received. Executing 3-step action plan." });
+
+      let i = 0;
+      const logInterval = setInterval(() => {
+        if (i < dynamicLogs.length) {
+          const currentLog = dynamicLogs[i];
+          setLog(prev => [...prev, currentLog]);
+          setActiveAgent(currentLog.agent === "MCP" ? "SCOUT" : currentLog.agent); // Keep scout active during MCP
+          i++;
+        } else {
+          clearInterval(logInterval);
+          setActiveAgent(null);
+          setAn(false);
+        }
+      }, 800);
+
+    } catch (error: any) {
+      const errorMsg = error.message.includes("429") 
+        ? "API Quota Exceeded. Please change Gemini API Key in .env" 
+        : `Connection/Swarm Error: ${error.message}`;
+        
+      setLog(prev => [...prev, { ts: getLogTimestamp(), agent: "CMD", highlight: "override", msg: errorMsg }]);
+      setAn(false);
+      setActiveAgent(null);
+    }
   }, []);
 
-  const threat = REPORT.critic_review.adjusted_threat_level;
-  const threatColor = threat === "CRITICAL" ? "#f85149" : threat === "HIGH" ? "#f0883e" : threat === "MEDIUM" ? "#e3b341" : "#3fb950";
+  const threat = report.critic_review.adjusted_threat_level;
+  const threatColor = threat === "CRITICAL" ? "#f85149" : threat === "HIGH" ? "#f0883e" : threat === "MEDIUM" ? "#e3b341" : threat === "STANDBY" ? "#1e4a6a" : "#3fb950";
 
   return (
     <>
@@ -358,13 +416,34 @@ export default function AegisDashboard() {
         <div style={{ flex:1, display:"grid", gridTemplateColumns:"238px 1fr 278px", overflow:"hidden" }}>
 
           {/* ─── LEFT COLUMN ─── */}
-          <div style={{ borderRight:"1px solid #0e1f2e", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+          <div style={{ borderRight:"1px solid #0e1f2e", display:"flex", flexDirection:"column", overflow:"hidden", overflowY:"auto" }}>
 
             {/* Topology */}
             <div style={{ padding:"12px 14px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
               <div style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060", marginBottom:"10px" }}>SWARM TOPOLOGY</div>
               <div style={{ height:"208px" }}>
-                <SwarmTopology/>
+                <SwarmTopology activeAgent={activeAgent}/>
+              </div>
+            </div>
+
+            {/* MCP TELEMETRY (NEW PANEL) */}
+            <div style={{ padding:"10px 14px", borderBottom:"1px solid #0e1f2e", flexShrink:0, background: threat === 'STANDBY' ? "transparent" : "rgba(0, 210, 255, 0.02)" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
+                <span style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060" }}>MCP TELEMETRY</span>
+                <span style={{ fontSize:"7px", letterSpacing:"0.1em", border:"1px solid rgba(0, 210, 255, 0.4)", color:"#00d2ff", padding:"1px 6px", borderRadius:"2px" }}>EXTERNAL API</span>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px", marginBottom:"5px" }}>
+                <div style={{ padding:"7px 9px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
+                  <div style={{ fontSize:"7px", letterSpacing:"0.12em", color:"#1a4060" }}>WIND SPEED</div>
+                  <div style={{ fontSize:"13px", color:"#00d2ff", marginTop:"2px" }}>{report.mcp_data?.wind_speed}</div>
+                </div>
+                <div style={{ padding:"7px 9px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
+                  <div style={{ fontSize:"7px", letterSpacing:"0.12em", color:"#1a4060" }}>TEMPERATURE</div>
+                  <div style={{ fontSize:"13px", color:"#00d2ff", marginTop:"2px" }}>{report.mcp_data?.temperature}</div>
+                </div>
+              </div>
+              <div style={{ fontSize:"7px", color:"#4a6a80", letterSpacing:"0.05em", textTransform: 'uppercase' }}>
+                SRC: {report.mcp_data?.source}
               </div>
             </div>
 
@@ -373,38 +452,29 @@ export default function AegisDashboard() {
               <div style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060", marginBottom:"8px" }}>SCOUT EXTRACTION</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
                 {[
-                  { k:"ENTITIES",  v:String(REPORT.scout_data.people_count),  c:"#b8cfe0" },
-                  { k:"PATHS OUT", v:String(REPORT.scout_data.blocked_paths), c:"#f0883e" },
-                  { k:"TERRAIN",   v:"Highway",                               c:"#58a6ff" },
-                  { k:"HAZARDS",   v:String(REPORT.scout_data.hazard_factors.length), c:"#f85149" },
+                  { k:"ENTITIES",  v:String(report.scout_data.people_count),  c:"#b8cfe0" },
+                  { k:"PATHS OUT", v:String(report.scout_data.blocked_paths), c:"#f0883e" },
+                  { k:"TERRAIN",   v:report.scout_data.environment_type.split(' ')[0], c:"#58a6ff" },
+                  { k:"HAZARDS",   v:String(report.scout_data.hazard_factors.length), c:"#f85149" },
                 ].map(({ k, v, c }) => (
                   <div key={k} style={{ padding:"7px 9px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
                     <div style={{ fontSize:"7px", letterSpacing:"0.12em", color:"#1a4060" }}>{k}</div>
-                    <div style={{ fontSize:"15px", color:c, marginTop:"2px" }}>{v}</div>
+                    <div style={{ fontSize:"15px", color:c, marginTop:"2px", textTransform: 'capitalize' }}>{v}</div>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Threat display */}
-            <div style={{ margin:"10px 14px", padding:"12px", background:"rgba(248,81,73,0.04)", border:"1px solid rgba(248,81,73,0.25)", borderRadius:"4px", flexShrink:0, animation:"criticGlow 2.5s ease-in-out infinite" }}>
-              <div style={{ fontSize:"8px", letterSpacing:"0.14em", color:"#4a2020", marginBottom:"4px" }}>RESOLVED THREAT</div>
+            <div style={{ margin:"10px 14px", padding:"12px", background: threat === 'STANDBY' ? "#03070c" : "rgba(248,81,73,0.04)", border:`1px solid ${threatColor}`, borderRadius:"4px", flexShrink:0, animation: threat !== 'STANDBY' ? "criticGlow 2.5s ease-in-out infinite" : "none" }}>
+              <div style={{ fontSize:"8px", letterSpacing:"0.14em", color: threat === 'STANDBY' ? "#1a4060" : "#4a2020", marginBottom:"4px" }}>RESOLVED THREAT</div>
               <div style={{ fontSize:"26px", color:threatColor, fontWeight:600, letterSpacing:"0.04em" }}>{threat}</div>
-              <div style={{ fontSize:"9px", color:"#6a3030", marginTop:"4px", lineHeight:1.5 }}>
-                Critic override — {REPORT.scout_data.environment_type}
+              <div style={{ fontSize:"9px", color: threat === 'STANDBY' ? "#1a4060" : "#6a3030", marginTop:"4px", lineHeight:1.5 }}>
+                {report.scout_data.environment_type}
               </div>
             </div>
-
-            {/* Hazard list */}
-            <div style={{ padding:"0 14px 14px", flex:1, overflowY:"auto" }}>
-              <div style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060", marginBottom:"8px" }}>HAZARD FACTORS</div>
-              {REPORT.scout_data.hazard_factors.map((h, i) => (
-                <div key={i} style={{ display:"flex", gap:"7px", alignItems:"flex-start", fontSize:"9px", marginBottom:"5px" }}>
-                  <span style={{ color:"#f85149", flexShrink:0, marginTop:"1px" }}>▸</span>
-                  <span style={{ color:"#4a6a80", lineHeight:1.5, textTransform:"capitalize" }}>{h}</span>
-                </div>
-              ))}
-            </div>
+            
+            <div style={{ paddingBottom: "20px" }}></div>
           </div>
 
           {/* ─── CENTER COLUMN ─── */}
@@ -414,7 +484,7 @@ export default function AegisDashboard() {
             <div style={{ padding:"12px 14px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
               <div style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060", marginBottom:"8px", display:"flex", alignItems:"center", gap:"12px" }}>
                 INPUT FEED
-                {analyzing && <span style={{ color:"#f0883e", fontSize:"8px", animation:"blink 0.6s step-end infinite" }}>● ANALYZING…</span>}
+                {analyzing && <span style={{ color:"#f0883e", fontSize:"8px", animation:"blink 0.6s step-end infinite" }}>● TRANSMITTING TO SWARM...</span>}
               </div>
               <ImageZone src={src} onUpload={handleUpload} analyzing={analyzing}/>
             </div>
@@ -423,17 +493,17 @@ export default function AegisDashboard() {
             <div style={{ padding:"12px 14px", flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
               <div style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060", marginBottom:"10px", flexShrink:0 }}>COMMANDER — 3-STEP PLAN</div>
               <div style={{ display:"flex", flexDirection:"column", gap:"7px", flex:1, overflowY:"auto" }}>
-                {REPORT.commander_plan.immediate_actions.map((action, i) => (
+                {report.commander_plan.immediate_actions.map((action, i) => (
                   <div key={i} style={{
                     display:"flex", gap:"12px", padding:"10px 12px",
-                    background: i === 0 ? "rgba(248,81,73,0.04)" : "#040b12",
-                    border:     `1px solid ${i === 0 ? "rgba(248,81,73,0.3)" : "#0e1f2e"}`,
+                    background: i === 0 && threat !== 'STANDBY' ? "rgba(248,81,73,0.04)" : "#040b12",
+                    border:     `1px solid ${i === 0 && threat !== 'STANDBY' ? "rgba(248,81,73,0.3)" : "#0e1f2e"}`,
                     borderRadius:"3px", alignItems:"flex-start", flexShrink:0,
                   }}>
-                    <span style={{ fontSize:"9px", fontWeight:600, color: i === 0 ? "#f85149" : "#1a4060", minWidth:"20px", marginTop:"1px" }}>
+                    <span style={{ fontSize:"9px", fontWeight:600, color: i === 0 && threat !== 'STANDBY' ? "#f85149" : "#1a4060", minWidth:"20px", marginTop:"1px" }}>
                       {String(i+1).padStart(2,"0")}
                     </span>
-                    <p style={{ fontSize:"11px", lineHeight:1.6, color: i === 0 ? "#c06050" : i === 1 ? "#4a8aaa" : "#3a6a80", margin:0 }}>
+                    <p style={{ fontSize:"11px", lineHeight:1.6, color: i === 0 && threat !== 'STANDBY' ? "#c06050" : i === 1 ? "#4a8aaa" : "#3a6a80", margin:0 }}>
                       {action}
                     </p>
                   </div>
@@ -443,7 +513,7 @@ export default function AegisDashboard() {
 
             {/* Status bar */}
             <div style={{ height:"32px", borderTop:"1px solid #0e1f2e", background:"#040b12", display:"flex", alignItems:"center", padding:"0 14px", gap:"22px", flexShrink:0 }}>
-              {[["PIPELINE","4-AGENT SWARM"],["BASE THREAT", REPORT.risk_assessment.threat_level],["CONFIDENCE","0.94"],["LATENCY","1.2s"]].map(([k,v])=>(
+              {[["PIPELINE", analyzing ? "PROCESSING" : "STANDBY"],["BASE THREAT", report.risk_assessment.threat_level]].map(([k,v])=>(
                 <span key={k} style={{ fontSize:"8px", letterSpacing:"0.08em", color:"#1a3a52" }}>
                   {k} <span style={{ color:"#1e5a7a" }}>{v}</span>
                 </span>
@@ -469,12 +539,11 @@ export default function AegisDashboard() {
               <div style={{ background:"#030a10", border:"1px solid #0e1f2e", borderRadius:"3px", padding:"10px 12px", fontSize:"10px", lineHeight:1.9, fontFamily:"monospace" }}>
                 <span style={{ color:"#2a5a7a" }}>{"{"}</span><br/>
                 {([
-                  ["threat",          `"${threat}"`,                              "#f85149"],
-                  ["base_threat",     `"${REPORT.risk_assessment.threat_level}"`, "#5a8aaa"],
-                  ["entities",        String(REPORT.scout_data.people_count),      "#e0a050"],
-                  ["critic_override", "true",                                      "#3fb950"],
-                  ["confidence",      "0.94",                                      "#e0a050"],
-                  ["plan_steps",      `["perimeter","safe_zones","broadcast"]`,    "#5a8aaa"],
+                  ["threat",          `"${threat}"`,                              threatColor],
+                  ["base_threat",     `"${report.risk_assessment.threat_level}"`, "#5a8aaa"],
+                  ["entities",        String(report.scout_data.people_count),      "#e0a050"],
+                  ["mcp_source",      `"${report.mcp_data?.source || 'STANDBY'}"`, "#00d2ff"],
+                  ["critic_override", report.critic_review.adjusted_threat_level !== report.risk_assessment.threat_level ? "true" : "false", "#3fb950"],
                 ] as const).map(([k,v,c]) => (
                   <span key={k}>
                     {"  "}
@@ -488,10 +557,10 @@ export default function AegisDashboard() {
               </div>
 
               {/* Critic reasoning */}
-              <div style={{ marginTop:"8px", padding:"9px 12px", background:"rgba(248,81,73,0.03)", border:"1px solid rgba(248,81,73,0.18)", borderRadius:"3px" }}>
-                <div style={{ fontSize:"7px", letterSpacing:"0.14em", color:"#5a2020", marginBottom:"5px" }}>CRITIC REASONING</div>
-                <p style={{ fontSize:"9px", color:"#7a4040", lineHeight:1.6, margin:0 }}>
-                  {REPORT.critic_review.critic_reasoning}
+              <div style={{ marginTop:"8px", padding:"9px 12px", background: threat === 'STANDBY' ? "transparent" : "rgba(248,81,73,0.03)", border: threat === 'STANDBY' ? "1px solid #0e1f2e" : "1px solid rgba(248,81,73,0.18)", borderRadius:"3px" }}>
+                <div style={{ fontSize:"7px", letterSpacing:"0.14em", color: threat === 'STANDBY' ? "#1a4060" : "#5a2020", marginBottom:"5px" }}>CRITIC REASONING</div>
+                <p style={{ fontSize:"9px", color: threat === 'STANDBY' ? "#1a4060" : "#7a4040", lineHeight:1.6, margin:0 }}>
+                  {report.critic_review.critic_reasoning}
                 </p>
               </div>
             </div>
