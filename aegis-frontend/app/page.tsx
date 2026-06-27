@@ -36,7 +36,7 @@ interface ReportData {
 
 const AGENT_STYLES: Record<AgentName, { border: string; text: string; bg: string }> = {
   SCOUT:  { border: "#58a6ff", text: "#58a6ff", bg: "rgba(88,166,255,0.09)"   },
-  MCP:    { border: "#00d2ff", text: "#00d2ff", bg: "rgba(0,210,255,0.09)"    }, // New MCP Agent Style
+  MCP:    { border: "#00d2ff", text: "#00d2ff", bg: "rgba(0,210,255,0.09)"    }, 
   RISK:   { border: "#3fb950", text: "#3fb950", bg: "rgba(63,185,80,0.09)"    },
   CRITIC: { border: "#f85149", text: "#f85149", bg: "rgba(248,81,73,0.13)"    },
   CMD:    { border: "#a371f7", text: "#a371f7", bg: "rgba(163,113,247,0.09)"  },
@@ -97,15 +97,15 @@ function AgentBadge({ agent }: { agent: AgentName }) {
       display:        "inline-flex",
       alignItems:     "center",
       justifyContent: "center",
-      fontSize:       "8px",
+      fontSize:       "9px",
       fontWeight:     600,
       letterSpacing:  "0.08em",
       border:         `1px solid ${s.border}`,
       color:          s.text,
       background:     s.bg,
       borderRadius:   "2px",
-      height:         "18px",
-      minWidth:       "42px",
+      height:         "20px",
+      minWidth:       "46px",
       flexShrink:     0,
       fontFamily:     "var(--font-mono, monospace)",
     }}>
@@ -132,9 +132,9 @@ function DebateLog({ entries }: { entries: LogEntry[] }) {
   };
 
   return (
-    <div ref={ref} style={{ flex:1, overflowY:"auto", paddingRight:"4px", fontSize:"10px" }}>
+    <div ref={ref} style={{ flex:1, overflowY:"auto", paddingRight:"4px", fontSize:"11px" }}>
       {entries.filter(Boolean).map((entry, i) => (
-        <div key={i} style={{ display:"grid", gridTemplateColumns:"52px 46px 1fr", gap:"2px", marginBottom:"10px", animation:"logIn 0.25s ease" }}>
+        <div key={i} style={{ display:"grid", gridTemplateColumns:"58px 50px 1fr", gap:"4px", marginBottom:"12px", animation:"logIn 0.25s ease" }}>
           <span style={{ color:"#1e3a52", paddingTop:"2px", fontFamily:"monospace" }}>{entry.ts}</span>
           <AgentBadge agent={entry.agent} />
           <span style={{ lineHeight:1.6, color:msgColor(entry.highlight), fontWeight: entry.highlight==="override" ? 600 : 400 }}>
@@ -146,7 +146,7 @@ function DebateLog({ entries }: { entries: LogEntry[] }) {
       {/* blinking cursor line */}
       <div style={{ display:"flex", alignItems:"center", gap:"8px", marginTop:"6px", paddingTop:"6px", borderTop:"1px solid #0e1f2e" }}>
         <span style={{ display:"inline-block", width:6, height:12, background:"#1e4a6a", animation:"blink 1s step-end infinite" }} />
-        <span style={{ fontSize:"8px", letterSpacing:"0.12em", color:"#1a3a52" }}>PIPELINE ACTIVE</span>
+        <span style={{ fontSize:"9px", letterSpacing:"0.12em", color:"#1a3a52" }}>PIPELINE ACTIVE</span>
       </div>
     </div>
   );
@@ -154,37 +154,62 @@ function DebateLog({ entries }: { entries: LogEntry[] }) {
 
 /* ── SwarmTopology ───────────────────────────────────────────────────── */
 
+/* ── SwarmTopology ───────────────────────────────────────────────────── */
+
 function SwarmTopology({ activeAgent }: { activeAgent: string | null }) {
+  // Determine flow state based on active agent
+  const isExtracting = activeAgent === 'SCOUT' || activeAgent === 'MCP' || activeAgent === 'RISK' || activeAgent === 'CRITIC';
+  const isCommanding = activeAgent === 'CMD';
+
   return (
     <svg viewBox="0 0 260 210" xmlns="http://www.w3.org/2000/svg" style={{ width:"100%", height:"100%" }}>
       <defs>
-        <marker id="a1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-          <path d="M2 1L8 5L2 9" fill="none" stroke="#1e4a6a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </marker>
         <marker id="a2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
           <path d="M2 1L8 5L2 9" fill="none" stroke="#f85149" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </marker>
       </defs>
 
-      {/* flow lines */}
-      <line x1="130" y1="38" x2="52"  y2="98"  stroke="#1e4a6a" strokeWidth="1" markerEnd="url(#a1)"/>
-      <line x1="130" y1="38" x2="208" y2="98"  stroke="#1e4a6a" strokeWidth="1" markerEnd="url(#a1)"/>
-      <line x1="52"  y1="118" x2="125" y2="170" stroke="#0e2030" strokeWidth="0.5" strokeDasharray="4 3"/>
-      <line x1="208" y1="118" x2="135" y2="170" stroke="#0e2030" strokeWidth="0.5" strokeDasharray="4 3"/>
+      {/* 🌟 NEW: Animated Data Flow Lines (Scout to Risk/Critic) */}
+      <line x1="130" y1="38" x2="52"  y2="98"  
+        stroke={isExtracting ? "#58a6ff" : "#1e3a52"} 
+        strokeWidth={isExtracting ? "1.5" : "1"} 
+        strokeDasharray="4 4" 
+        style={isExtracting ? { animation: "dataFlow 0.6s linear infinite" } : { opacity: 0.4 }}
+      />
+      <line x1="130" y1="38" x2="208" y2="98"  
+        stroke={isExtracting ? "#58a6ff" : "#1e3a52"} 
+        strokeWidth={isExtracting ? "1.5" : "1"} 
+        strokeDasharray="4 4" 
+        style={isExtracting ? { animation: "dataFlow 0.6s linear infinite" } : { opacity: 0.4 }}
+      />
+
+      {/* 🌟 NEW: Animated Data Flow Lines (Risk/Critic to Command) */}
+      <line x1="52"  y1="118" x2="125" y2="170" 
+        stroke={isCommanding ? "#a371f7" : "#0e2030"} 
+        strokeWidth={isCommanding ? "1.5" : "0.5"} 
+        strokeDasharray="4 4" 
+        style={isCommanding ? { animation: "dataFlow 0.6s linear infinite" } : { opacity: 0.4 }}
+      />
+      <line x1="208" y1="118" x2="135" y2="170" 
+        stroke={isCommanding ? "#a371f7" : "#0e2030"} 
+        strokeWidth={isCommanding ? "1.5" : "0.5"} 
+        strokeDasharray="4 4" 
+        style={isCommanding ? { animation: "dataFlow 0.6s linear infinite" } : { opacity: 0.4 }}
+      />
 
       {/* animated debate edge */}
       <line x1="72" y1="108" x2="188" y2="108"
-        stroke="#f85149" strokeWidth="1.5" opacity={activeAgent === 'CRITIC' ? 0.9 : 0.3}
+        stroke="#f85149" strokeWidth="1.5" opacity={activeAgent === 'CRITIC' || activeAgent === 'RISK' ? 0.9 : 0.2}
         strokeDasharray="6 4"
         markerEnd="url(#a2)" markerStart="url(#a2)"
-        style={activeAgent === 'CRITIC' ? { animation:"debateDash 1s linear infinite" } : {}}
+        style={activeAgent === 'CRITIC' || activeAgent === 'RISK' ? { animation:"debateDash 1s linear infinite" } : {}}
       />
-      <text x="130" y="103" fill={activeAgent === 'CRITIC' ? "#f85149" : "#7a2020"} fontSize="7" textAnchor="middle" letterSpacing="2" fontFamily="monospace">DEBATE</text>
+      <text x="130" y="103" fill={activeAgent === 'CRITIC' || activeAgent === 'RISK' ? "#f85149" : "#7a2020"} fontSize="7" textAnchor="middle" letterSpacing="2" fontFamily="monospace">DEBATE</text>
 
       {/* SCOUT */}
       <rect x="90" y="14" width="80" height="32" rx="3" fill="rgba(88,166,255,0.06)" stroke={activeAgent === 'SCOUT' ? "#ffffff" : "#58a6ff"} strokeWidth={activeAgent === 'SCOUT' ? "1.5" : "0.7"}/>
       <text x="130" y="27" textAnchor="middle" fill="#58a6ff" fontSize="9" fontWeight="500" letterSpacing="1.5" fontFamily="monospace">SCOUT</text>
-      <text x="130" y="40" textAnchor="middle" fill="#2a6a8a" fontSize="7" letterSpacing="1" fontFamily="monospace">{activeAgent ? 'ACTIVE ●' : 'DONE ✓'}</text>
+      <text x="130" y="40" textAnchor="middle" fill="#2a6a8a" fontSize="7" letterSpacing="1" fontFamily="monospace">{activeAgent ? (activeAgent === 'CMD' ? 'DONE ✓' : 'ACTIVE ●') : 'DONE ✓'}</text>
 
       {/* RISK */}
       <rect x="14" y="90" width="76" height="32" rx="3" fill="rgba(63,185,80,0.04)" stroke="#3fb950" strokeWidth="0.7"/>
@@ -197,10 +222,15 @@ function SwarmTopology({ activeAgent }: { activeAgent: string | null }) {
       <text x="208" y="103" textAnchor="middle" fill="#f85149" fontSize="9" fontWeight="500" letterSpacing="1.5" fontFamily="monospace">CRITIC</text>
       <text x="208" y="116" textAnchor="middle" fill="#9a2020" fontSize="7" letterSpacing="1" fontFamily="monospace">{activeAgent === 'CRITIC' ? 'ACTIVE ●' : 'STANDBY'}</text>
 
-      {/* COMMANDER */}
-      <rect x="90" y="162" width="80" height="32" rx="3" fill="#060f1a" stroke={activeAgent === 'CMD' ? "#a371f7" : "#1e2a38"} strokeWidth="0.5"/>
+      {/* COMMANDER - GLOW EFFECT */}
+      <rect x="90" y="162" width="80" height="32" rx="3" 
+        fill={activeAgent === 'CMD' ? "rgba(163,113,247,0.15)" : "#060f1a"} 
+        stroke={activeAgent === 'CMD' ? "#a371f7" : "#1e2a38"} 
+        strokeWidth={activeAgent === 'CMD' ? "1.5" : "0.5"}
+        style={activeAgent === 'CMD' ? { filter:"drop-shadow(0 0 8px rgba(163,113,247,0.5))", transition: "all 0.3s ease" } : { transition: "all 0.3s ease" }}
+      />
       <text x="130" y="175" textAnchor="middle" fill={activeAgent === 'CMD' ? "#a371f7" : "#2a3a4a"} fontSize="9" letterSpacing="1.5" fontFamily="monospace">COMMAND</text>
-      <text x="130" y="188" textAnchor="middle" fill="#1a2a3a" fontSize="7" letterSpacing="1" fontFamily="monospace">PENDING…</text>
+      <text x="130" y="188" textAnchor="middle" fill={activeAgent === 'CMD' ? "#d0b0ff" : "#1a2a3a"} fontSize="7" letterSpacing="1" fontFamily="monospace">{activeAgent === 'CMD' ? 'EXECUTING ●' : 'PENDING…'}</text>
     </svg>
   );
 }
@@ -225,7 +255,7 @@ function ImageZone({ src, onUpload, analyzing }: { src:string|null; onUpload:(f:
       onDragLeave={() => setDrag(false)}
       onDrop={onDrop}
       style={{
-        height:       "220px",
+        height:       "260px",
         background:   "#03070c",
         border:       `1px solid ${drag ? "#58a6ff" : "#1e2a38"}`,
         borderRadius: "4px",
@@ -270,11 +300,11 @@ function ImageZone({ src, onUpload, analyzing }: { src:string|null; onUpload:(f:
         ? <img src={src} alt="feed" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"contain" }}/>
         : (
           <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px" }}>
-            <svg style={{ width:28, height:28, color:"#1e4a6a" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <svg style={{ width:32, height:32, color:"#1e4a6a" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
             </svg>
-            <span style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1e4a6a" }}>
+            <span style={{ fontSize:"10px", letterSpacing:"0.2em", color:"#1e4a6a" }}>
               {drag ? "DROP IMAGE" : "DRONE / CCTV FEED — CLICK OR DROP"}
             </span>
           </div>
@@ -360,7 +390,7 @@ export default function AegisDashboard() {
           i++;
         } else {
           clearInterval(logInterval);
-          setActiveAgent(null);
+          setActiveAgent("CMD"); 
           setAn(false);
         }
       }, 800);
@@ -381,95 +411,96 @@ export default function AegisDashboard() {
 
   return (
     <>
-      {/* ── keyframes injected once ── */}
+{/* ── keyframes injected once ── */}
       <style>{`
         @keyframes blink      { 0%,100%{opacity:1} 50%{opacity:0} }
         @keyframes logIn      { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none} }
         @keyframes scan       { from{top:0%} to{top:100%} }
         @keyframes debateDash { to{stroke-dashoffset:-20} }
         @keyframes criticGlow { 0%,100%{box-shadow:0 0 8px rgba(248,81,73,.15)} 50%{box-shadow:0 0 22px rgba(248,81,73,.35)} }
+        @keyframes dataFlow   { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
         ::-webkit-scrollbar       { width:3px; height:3px }
         ::-webkit-scrollbar-track { background:transparent }
         ::-webkit-scrollbar-thumb { background:#1e2a38; border-radius:2px }
       `}</style>
 
-      <div style={{ height:"100vh", background:"#050c14", color:"#b8cfe0", fontFamily:"'Geist Mono',ui-monospace,monospace", fontSize:"12px", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+      <div style={{ height:"100vh", background:"#050c14", color:"#b8cfe0", fontFamily:"'Geist Mono',ui-monospace,monospace", fontSize:"13px", display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
-        {/* ── TOPBAR ── */}
-        <header style={{ height:"40px", flexShrink:0, background:"#040b12", borderBottom:"1px solid #0e1f2e", display:"flex", alignItems:"center", padding:"0 20px", gap:"14px" }}>
-          <span style={{ fontSize:"13px", fontWeight:600, letterSpacing:"0.22em", color:"#e0edf8" }}>AEGIS–SWARM</span>
-          <div style={{ width:"1px", height:"16px", background:"#0e1f2e" }}/>
-          <span style={{ fontSize:"9px", display:"flex", alignItems:"center", gap:"5px", letterSpacing:"0.1em", color:"#3fb950" }}>
-            <span style={{ width:5, height:5, borderRadius:"50%", background:"#3fb950", display:"inline-block", animation:"blink 1s step-end infinite" }}/>
+        {/* ── TOPBAR (Thicker & Bolder) ── */}
+        <header style={{ height:"56px", flexShrink:0, background:"#040b12", borderBottom:"1px solid #0e1f2e", display:"flex", alignItems:"center", padding:"0 24px", gap:"16px" }}>
+          <span style={{ fontSize:"16px", fontWeight:700, letterSpacing:"0.25em", color:"#e0edf8" }}>AEGIS–SWARM</span>
+          <div style={{ width:"1px", height:"20px", background:"#0e1f2e" }}/>
+          <span style={{ fontSize:"10px", display:"flex", alignItems:"center", gap:"6px", letterSpacing:"0.1em", color:"#3fb950" }}>
+            <span style={{ width:6, height:6, borderRadius:"50%", background:"#3fb950", display:"inline-block", animation:"blink 1s step-end infinite" }}/>
             LIVE ANALYSIS
           </span>
-          <div style={{ marginLeft:"auto", display:"flex", gap:"20px", alignItems:"center" }}>
-            <span style={{ fontSize:"9px", letterSpacing:"0.12em", color:"#1a4060" }}>NEURAL MESH / 4-AGENT PIPELINE</span>
-            <span style={{ fontSize:"9px", color:"#1a3a52", fontFamily:"monospace" }}>
-              FRAME <span style={{ color:"#1e4a6a" }}>{String(frame).padStart(4,"0")}</span>
+          <div style={{ marginLeft:"auto", display:"flex", gap:"24px", alignItems:"center" }}>
+            <span style={{ fontSize:"10px", letterSpacing:"0.15em", color:"#2a5a7a" }}>NEURAL MESH / 4-AGENT PIPELINE</span>
+            <span style={{ fontSize:"10px", color:"#1a3a52", fontFamily:"monospace" }}>
+              FRAME <span style={{ color:"#2a6a8a" }}>{String(frame).padStart(4,"0")}</span>
             </span>
-            <span style={{ fontSize:"9px", color:"#1a3052", fontFamily:"monospace" }}>{utcTime}</span>
+            <span style={{ fontSize:"10px", color:"#2a5a7a", fontFamily:"monospace" }}>{utcTime}</span>
           </div>
         </header>
 
-        {/* ── MAIN GRID ── */}
-        <div style={{ flex:1, display:"grid", gridTemplateColumns:"238px 1fr 278px", overflow:"hidden" }}>
+        {/* ── MAIN GRID (Wider Left & Right Panels) ── */}
+        <div style={{ flex:1, display:"grid", gridTemplateColumns:"350px 1fr 380px", overflow:"hidden" }}>
 
           {/* ─── LEFT COLUMN ─── */}
           <div style={{ borderRight:"1px solid #0e1f2e", display:"flex", flexDirection:"column", overflow:"hidden", overflowY:"auto" }}>
 
             {/* Topology */}
-            <div style={{ padding:"12px 14px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
-              <div style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060", marginBottom:"10px" }}>SWARM TOPOLOGY</div>
-              <div style={{ height:"208px" }}>
+            <div style={{ padding:"16px 20px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
+              <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060", marginBottom:"12px" }}>SWARM TOPOLOGY</div>
+              <div style={{ height:"220px" }}>
                 <SwarmTopology activeAgent={activeAgent}/>
               </div>
             </div>
 
-            {/* MCP TELEMETRY (NEW PANEL) */}
-            <div style={{ padding:"10px 14px", borderBottom:"1px solid #0e1f2e", flexShrink:0, background: threat === 'STANDBY' ? "transparent" : "rgba(0, 210, 255, 0.02)" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
-                <span style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060" }}>MCP TELEMETRY</span>
-                <span style={{ fontSize:"7px", letterSpacing:"0.1em", border:"1px solid rgba(0, 210, 255, 0.4)", color:"#00d2ff", padding:"1px 6px", borderRadius:"2px" }}>EXTERNAL API</span>
+            {/* MCP TELEMETRY */}
+            <div style={{ padding:"16px 20px", borderBottom:"1px solid #0e1f2e", flexShrink:0, background: threat === 'STANDBY' ? "transparent" : "rgba(0, 210, 255, 0.02)" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
+                <span style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060" }}>MCP TELEMETRY</span>
+                <span style={{ fontSize:"8px", letterSpacing:"0.1em", border:"1px solid rgba(0, 210, 255, 0.4)", color:"#00d2ff", padding:"2px 8px", borderRadius:"2px" }}>EXTERNAL API</span>
               </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px", marginBottom:"5px" }}>
-                <div style={{ padding:"7px 9px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
-                  <div style={{ fontSize:"7px", letterSpacing:"0.12em", color:"#1a4060" }}>WIND SPEED</div>
-                  <div style={{ fontSize:"13px", color:"#00d2ff", marginTop:"2px" }}>{report.mcp_data?.wind_speed}</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px", marginBottom:"8px" }}>
+                <div style={{ padding:"10px 12px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
+                  <div style={{ fontSize:"8px", letterSpacing:"0.12em", color:"#1a4060" }}>WIND SPEED</div>
+                  <div style={{ fontSize:"15px", color:"#00d2ff", marginTop:"4px" }}>{report.mcp_data?.wind_speed}</div>
                 </div>
-                <div style={{ padding:"7px 9px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
-                  <div style={{ fontSize:"7px", letterSpacing:"0.12em", color:"#1a4060" }}>TEMPERATURE</div>
-                  <div style={{ fontSize:"13px", color:"#00d2ff", marginTop:"2px" }}>{report.mcp_data?.temperature}</div>
+                <div style={{ padding:"10px 12px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
+                  <div style={{ fontSize:"8px", letterSpacing:"0.12em", color:"#1a4060" }}>TEMPERATURE</div>
+                  <div style={{ fontSize:"15px", color:"#00d2ff", marginTop:"4px" }}>{report.mcp_data?.temperature}</div>
                 </div>
               </div>
-              <div style={{ fontSize:"7px", color:"#4a6a80", letterSpacing:"0.05em", textTransform: 'uppercase' }}>
+              <div style={{ fontSize:"8px", color:"#4a6a80", letterSpacing:"0.08em", textTransform: 'uppercase' }}>
                 SRC: {report.mcp_data?.source}
               </div>
             </div>
 
             {/* Scout data */}
-            <div style={{ padding:"10px 14px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
-              <div style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060", marginBottom:"8px" }}>SCOUT EXTRACTION</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
+            <div style={{ padding:"16px 20px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
+              <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060", marginBottom:"10px" }}>SCOUT EXTRACTION</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px" }}>
                 {[
                   { k:"ENTITIES",  v:String(report.scout_data.people_count),  c:"#b8cfe0" },
                   { k:"PATHS OUT", v:String(report.scout_data.blocked_paths), c:"#f0883e" },
                   { k:"TERRAIN",   v:report.scout_data.environment_type.split(' ')[0], c:"#58a6ff" },
                   { k:"HAZARDS",   v:String(report.scout_data.hazard_factors.length), c:"#f85149" },
                 ].map(({ k, v, c }) => (
-                  <div key={k} style={{ padding:"7px 9px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
-                    <div style={{ fontSize:"7px", letterSpacing:"0.12em", color:"#1a4060" }}>{k}</div>
-                    <div style={{ fontSize:"15px", color:c, marginTop:"2px", textTransform: 'capitalize' }}>{v}</div>
+                  <div key={k} style={{ padding:"10px 12px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
+                    <div style={{ fontSize:"8px", letterSpacing:"0.12em", color:"#1a4060" }}>{k}</div>
+                    <div style={{ fontSize:"16px", color:c, marginTop:"4px", textTransform: 'capitalize' }}>{v}</div>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Threat display */}
-            <div style={{ margin:"10px 14px", padding:"12px", background: threat === 'STANDBY' ? "#03070c" : "rgba(248,81,73,0.04)", border:`1px solid ${threatColor}`, borderRadius:"4px", flexShrink:0, animation: threat !== 'STANDBY' ? "criticGlow 2.5s ease-in-out infinite" : "none" }}>
-              <div style={{ fontSize:"8px", letterSpacing:"0.14em", color: threat === 'STANDBY' ? "#1a4060" : "#4a2020", marginBottom:"4px" }}>RESOLVED THREAT</div>
-              <div style={{ fontSize:"26px", color:threatColor, fontWeight:600, letterSpacing:"0.04em" }}>{threat}</div>
-              <div style={{ fontSize:"9px", color: threat === 'STANDBY' ? "#1a4060" : "#6a3030", marginTop:"4px", lineHeight:1.5 }}>
+            <div style={{ margin:"16px 20px", padding:"16px", background: threat === 'STANDBY' ? "#03070c" : "rgba(248,81,73,0.04)", border:`1px solid ${threatColor}`, borderRadius:"4px", flexShrink:0, animation: threat !== 'STANDBY' ? "criticGlow 2.5s ease-in-out infinite" : "none" }}>
+              <div style={{ fontSize:"9px", letterSpacing:"0.15em", color: threat === 'STANDBY' ? "#1a4060" : "#4a2020", marginBottom:"6px" }}>RESOLVED THREAT</div>
+              <div style={{ fontSize:"32px", color:threatColor, fontWeight:700, letterSpacing:"0.05em" }}>{threat}</div>
+              <div style={{ fontSize:"10px", color: threat === 'STANDBY' ? "#1a4060" : "#6a3030", marginTop:"6px", lineHeight:1.5 }}>
                 {report.scout_data.environment_type}
               </div>
             </div>
@@ -481,29 +512,29 @@ export default function AegisDashboard() {
           <div style={{ display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
             {/* Image feed */}
-            <div style={{ padding:"12px 14px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
-              <div style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060", marginBottom:"8px", display:"flex", alignItems:"center", gap:"12px" }}>
+            <div style={{ padding:"16px 20px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
+              <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060", marginBottom:"12px", display:"flex", alignItems:"center", gap:"12px" }}>
                 INPUT FEED
-                {analyzing && <span style={{ color:"#f0883e", fontSize:"8px", animation:"blink 0.6s step-end infinite" }}>● TRANSMITTING TO SWARM...</span>}
+                {analyzing && <span style={{ color:"#f0883e", fontSize:"9px", animation:"blink 0.6s step-end infinite" }}>● TRANSMITTING TO SWARM...</span>}
               </div>
               <ImageZone src={src} onUpload={handleUpload} analyzing={analyzing}/>
             </div>
 
             {/* Commander plan */}
-            <div style={{ padding:"12px 14px", flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-              <div style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060", marginBottom:"10px", flexShrink:0 }}>COMMANDER — 3-STEP PLAN</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:"7px", flex:1, overflowY:"auto" }}>
+            <div style={{ padding:"16px 20px", flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+              <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060", marginBottom:"14px", flexShrink:0 }}>COMMANDER — 3-STEP PLAN</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:"10px", flex:1, overflowY:"auto", paddingRight:"8px" }}>
                 {report.commander_plan.immediate_actions.map((action, i) => (
                   <div key={i} style={{
-                    display:"flex", gap:"12px", padding:"10px 12px",
+                    display:"flex", gap:"14px", padding:"14px 16px",
                     background: i === 0 && threat !== 'STANDBY' ? "rgba(248,81,73,0.04)" : "#040b12",
                     border:     `1px solid ${i === 0 && threat !== 'STANDBY' ? "rgba(248,81,73,0.3)" : "#0e1f2e"}`,
-                    borderRadius:"3px", alignItems:"flex-start", flexShrink:0,
+                    borderRadius:"4px", alignItems:"flex-start", flexShrink:0,
                   }}>
-                    <span style={{ fontSize:"9px", fontWeight:600, color: i === 0 && threat !== 'STANDBY' ? "#f85149" : "#1a4060", minWidth:"20px", marginTop:"1px" }}>
+                    <span style={{ fontSize:"11px", fontWeight:700, color: i === 0 && threat !== 'STANDBY' ? "#f85149" : "#1a4060", minWidth:"24px", marginTop:"1px" }}>
                       {String(i+1).padStart(2,"0")}
                     </span>
-                    <p style={{ fontSize:"11px", lineHeight:1.6, color: i === 0 && threat !== 'STANDBY' ? "#c06050" : i === 1 ? "#4a8aaa" : "#3a6a80", margin:0 }}>
+                    <p style={{ fontSize:"12px", lineHeight:1.7, color: i === 0 && threat !== 'STANDBY' ? "#c06050" : i === 1 ? "#4a8aaa" : "#3a6a80", margin:0 }}>
                       {action}
                     </p>
                   </div>
@@ -511,11 +542,11 @@ export default function AegisDashboard() {
               </div>
             </div>
 
-            {/* Status bar */}
-            <div style={{ height:"32px", borderTop:"1px solid #0e1f2e", background:"#040b12", display:"flex", alignItems:"center", padding:"0 14px", gap:"22px", flexShrink:0 }}>
+            {/* ── Status bar (Bigger & High Visibility) ── */}
+            <div style={{ height:"48px", borderTop:"1px solid #0e1f2e", background:"#040b12", display:"flex", alignItems:"center", padding:"0 20px", gap:"36px", flexShrink:0 }}>
               {[["PIPELINE", analyzing ? "PROCESSING" : "STANDBY"],["BASE THREAT", report.risk_assessment.threat_level]].map(([k,v])=>(
-                <span key={k} style={{ fontSize:"8px", letterSpacing:"0.08em", color:"#1a3a52" }}>
-                  {k} <span style={{ color:"#1e5a7a" }}>{v}</span>
+                <span key={k} style={{ fontSize:"10px", letterSpacing:"0.12em", color:"#4a6a80" }}>
+                  {k} <span style={{ color:"#58a6ff", fontWeight:600, marginLeft:"6px" }}>{v}</span>
                 </span>
               ))}
             </div>
@@ -525,18 +556,18 @@ export default function AegisDashboard() {
           <div style={{ borderLeft:"1px solid #0e1f2e", display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
             {/* Debate log */}
-            <div style={{ flex:"0 0 55%", borderBottom:"1px solid #0e1f2e", padding:"12px 14px", display:"flex", flexDirection:"column", overflow:"hidden" }}>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"10px", flexShrink:0 }}>
-                <span style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060" }}>AGENT DEBATE LOG</span>
-                <span style={{ fontSize:"7px", letterSpacing:"0.1em", border:"1px solid rgba(248,81,73,0.5)", color:"#f85149", padding:"1px 6px", borderRadius:"2px" }}>LIVE</span>
+            <div style={{ flex:"0 0 55%", borderBottom:"1px solid #0e1f2e", padding:"16px 20px", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px", flexShrink:0 }}>
+                <span style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060" }}>AGENT DEBATE LOG</span>
+                <span style={{ fontSize:"8px", letterSpacing:"0.1em", border:"1px solid rgba(248,81,73,0.5)", color:"#f85149", padding:"2px 8px", borderRadius:"2px" }}>LIVE</span>
               </div>
               <DebateLog entries={logEntries}/>
             </div>
 
             {/* JSON output */}
-            <div style={{ flex:1, padding:"12px 14px", overflowY:"auto" }}>
-              <div style={{ fontSize:"8px", letterSpacing:"0.18em", color:"#1a4060", marginBottom:"8px" }}>RAW JSON OUTPUT</div>
-              <div style={{ background:"#030a10", border:"1px solid #0e1f2e", borderRadius:"3px", padding:"10px 12px", fontSize:"10px", lineHeight:1.9, fontFamily:"monospace" }}>
+            <div style={{ flex:1, padding:"16px 20px", overflowY:"auto" }}>
+              <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060", marginBottom:"10px" }}>RAW JSON OUTPUT</div>
+              <div style={{ background:"#030a10", border:"1px solid #0e1f2e", borderRadius:"4px", padding:"12px 16px", fontSize:"11px", lineHeight:2.0, fontFamily:"monospace" }}>
                 <span style={{ color:"#2a5a7a" }}>{"{"}</span><br/>
                 {([
                   ["threat",          `"${threat}"`,                              threatColor],
@@ -557,9 +588,9 @@ export default function AegisDashboard() {
               </div>
 
               {/* Critic reasoning */}
-              <div style={{ marginTop:"8px", padding:"9px 12px", background: threat === 'STANDBY' ? "transparent" : "rgba(248,81,73,0.03)", border: threat === 'STANDBY' ? "1px solid #0e1f2e" : "1px solid rgba(248,81,73,0.18)", borderRadius:"3px" }}>
-                <div style={{ fontSize:"7px", letterSpacing:"0.14em", color: threat === 'STANDBY' ? "#1a4060" : "#5a2020", marginBottom:"5px" }}>CRITIC REASONING</div>
-                <p style={{ fontSize:"9px", color: threat === 'STANDBY' ? "#1a4060" : "#7a4040", lineHeight:1.6, margin:0 }}>
+              <div style={{ marginTop:"12px", padding:"12px 16px", background: threat === 'STANDBY' ? "transparent" : "rgba(248,81,73,0.03)", border: threat === 'STANDBY' ? "1px solid #0e1f2e" : "1px solid rgba(248,81,73,0.18)", borderRadius:"4px" }}>
+                <div style={{ fontSize:"8px", letterSpacing:"0.15em", color: threat === 'STANDBY' ? "#1a4060" : "#5a2020", marginBottom:"8px" }}>CRITIC REASONING</div>
+                <p style={{ fontSize:"10px", color: threat === 'STANDBY' ? "#1a4060" : "#7a4040", lineHeight:1.7, margin:0 }}>
                   {report.critic_review.critic_reasoning}
                 </p>
               </div>
