@@ -26,6 +26,10 @@
 
 </p>
 
+<p align="center">
+<img src="assets/demo.gif" width="100%">
+</p>
+
 **Autonomous Multi-Agent Visual Intelligence Framework**
 
 > **Most AI systems generate answers. AEGIS-SWARM generates trusted operational decisions.**
