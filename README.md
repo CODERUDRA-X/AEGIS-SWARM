@@ -190,4 +190,6 @@ npm run dev
 
 ---
 
-*Built with precision and intensity for the Kaggle Intensive Vibe Coding Capstone.*
+## 👨‍💻 Developer
+**Built by [CODERUDRA-X](https://github.com/CODERUDRA-X)**
+*Building the future of AI, Vision Systems, and Defense-Tech.*
