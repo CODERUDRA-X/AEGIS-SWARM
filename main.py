@@ -2,7 +2,7 @@ import os
 import json
 from dotenv import load_dotenv
 
-# Import all 4 agents
+# Imported all 4 agents
 from agents.scout import analyze_crowd_frame
 from agents.risk import evaluate_risk
 from agents.critic import challenge_risk_assessment

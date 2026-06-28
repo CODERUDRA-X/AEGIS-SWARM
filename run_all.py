@@ -3,7 +3,7 @@ import json
 import time
 from dotenv import load_dotenv
 
-# Import all agents
+# Imported all agents
 from agents.scout import analyze_crowd_frame
 from agents.risk import evaluate_risk
 from agents.critic import challenge_risk_assessment
@@ -16,16 +16,16 @@ def process_single_image(image_path, output_dir="outputs"):
     out_name = f"{os.path.splitext(filename)[0]}_report.json"
     out_path = os.path.join(output_dir, out_name)
     
-    # Skip if already processed (saves API calls!)
+    # to Skip if already processed (to saves API calls (✿◠‿◠)!!)
     if os.path.exists(out_path):
         print(f"⏩ Skipping {filename}, already processed.")
         return True
 
     print(f"\n🚀 Processing: {filename}...")
     try:
-        # Run the swarm with small delays between calls to avoid bursting
+        #here i Run the swarm with small delays between calls to avoid bursting
         scout_out = analyze_crowd_frame(image_path)
-        time.sleep(2) # 2 second breather
+        time.sleep(2) # 2 second breather 
         
         risk_out = evaluate_risk(scout_out)
         time.sleep(2)
@@ -66,7 +66,7 @@ def process_all_images(input_dir="test_images", output_dir="outputs"):
         
         if not success:
             print("⏳ API Limit hit. Waiting 60 seconds before next image...")
-            time.sleep(60) # Massive cooldown if an error happens
+            time.sleep(60) #by this Massive cooldown will be if an error happens
 
 if __name__ == "__main__":
     process_all_images()

@@ -1,7 +1,7 @@
 import os
 import json
 import shutil
-import requests # Naya import real API calls ke liye
+import requests # Naya import real API calls ke liye kiya hai
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -26,9 +26,9 @@ app.add_middleware(
 
 os.makedirs("temp_uploads", exist_ok=True)
 
-# ==========================================
+# ==========================================crx---
 # 🛠️ REAL MCP TOOL: Live Environmental Telemetry
-# ==========================================
+# ==========================================crx---
 def mcp_get_live_telemetry(lat: float = 34.0522, lon: float = -118.2437):
     """
     REAL MCP TOOL: Makes an actual HTTP request to an external Weather API.
