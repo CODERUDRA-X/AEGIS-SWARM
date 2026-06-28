@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AEGIS-SWARM — Autonomous Emergency Ground Intelligence System",
+  title: "AEGIS-SWARM",
   description: "4-Agent AI Swarm pipeline for drone/CCTV threat analysis",
 };
 
