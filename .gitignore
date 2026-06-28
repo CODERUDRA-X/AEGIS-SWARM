@@ -3,3 +3,4 @@ __pycache__/
 temp_uploads/
 node_modules/
 .next/
+assets/

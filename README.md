@@ -15,10 +15,9 @@
 ---
 
 ## 🎥 The Command Center in Action
-*(Add your 5-minute YouTube Pitch Video link here)*
 [![AEGIS-SWARM Pitch](https://img.shields.io/badge/YouTube-Watch_Pitch_Video-FF0000?style=for-the-badge&logo=youtube)](YOUR_YOUTUBE_LINK_HERE)
 
-*(Insert a cool GIF of your UI analyzing an image here)* ![Demo GIF](./docs/demo.gif)
+*soon.. ![Demo GIF](./docs/demo.gif)
 
 ---
 
