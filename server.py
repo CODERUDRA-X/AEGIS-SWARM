@@ -34,7 +34,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://aegis-swarm.vercel.app", 
+    "https://aegis-swarm-tan.vercel.app/", 
 ]
 app.add_middleware(
     CORSMiddleware,

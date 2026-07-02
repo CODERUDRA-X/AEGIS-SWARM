@@ -354,7 +354,7 @@ export default function AegisDashboard() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://localhost:8000/api/analyze", {
+      const res = await fetch("https://coderudra-x-aegis-swarm-backend.hf.space/api/analyze", {
         method: "POST",
         body: formData,
       });
