@@ -18,7 +18,7 @@
 <img src="https://img.shields.io/badge/📡_PROTOCOL-REAL_MCP_SERVER-FF9800?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/🛡️_TRUST-CRITIC_VALIDATED-43A047?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/🔒_SECURITY-PRODUCTION_HARDENED-8B0000?style=for-the-badge&labelColor=0D1117"/>
-<img src="https://img.shields.io/badge/☁️_DEPLOY-GOOGLE_CLOUD_RUN-4285F4?style=for-the-badge&logo=googlecloud&labelColor=0D1117"/>
+<img src="https://img.shields.io/badge/☁️_DEPLOY-LIVE_ON_VERCEL_%2B_HF-4285F4?style=for-the-badge&logo=vercel&labelColor=0D1117"/>
 
 </p>
 
@@ -34,11 +34,18 @@ Every recommendation is debated, challenged, validated against a **real MCP prot
 
 ---
 
+## 🌐 Live Demo
+
+| Component | Platform | Link |
+|---|---|---|
+| **Frontend (Command Dashboard)** | Vercel | [aegis-swarm-tan.vercel.app](https://aegis-swarm-tan.vercel.app) |
+| **Backend API (Swarm Engine)** | Hugging Face Spaces (Docker) | [coderudra-x-aegis-swarm-backend.hf.space](https://coderudra-x-aegis-swarm-backend.hf.space/api/analyze) |
+
+---
+
 ## 🎥 The Command Center in Action
 
 [![AEGIS-SWARM Pitch](https://img.shields.io/badge/YouTube-Watch_Pitch_Video-FF0000?style=for-the-badge&logo=youtube)](YOUR_YOUTUBE_LINK_HERE)
-
-> 🚧 Video will be live before the Kaggle submission deadline.
 
 ---
 
@@ -144,12 +151,12 @@ This means the telemetry provider is **fully decoupled** — swappable, independ
 
 ```mermaid
 flowchart LR
-    subgraph Frontend ["🖥️ Command Center UI"]
+    subgraph Frontend ["🖥️ Vercel — Command Center UI"]
         Next["Next.js + Tailwind v4"]
         Upload["Drag & Drop Upload"]
     end
 
-    subgraph Backend ["⚡ Swarm Engine (FastAPI)"]
+    subgraph Backend ["⚡ HF Spaces Docker — Swarm Engine"]
         Server["server.py\nOrchestrator"]
         subgraph Agents ["4-Agent Pipeline"]
             Scout["👁️ Scout"]
@@ -165,17 +172,12 @@ flowchart LR
         Weather["Open-Meteo\nLive API"]
     end
 
-    subgraph Deploy ["☁️ Deployment"]
-        Docker["Dockerfile\nCloud Run Ready"]
-    end
-
     Upload -->|"multipart/form-data\nimage/jpeg · png · webp\nmax 5MB"| Security
     Security --> Server
     Server --> Scout --> Risk --> Critic --> Commander
     Server <-->|"JSON-RPC\nstdio"| MCPServer
     MCPServer <-->|"HTTP"| Weather
     Commander -->|"Structured JSON"| Next
-    Backend -.->|"docker build"| Docker
 ```
 
 ---
@@ -187,7 +189,7 @@ Production-hardened from day one — not bolted on as an afterthought.
 | Layer | Implementation | What It Prevents |
 |---|---|---|
 | **Rate Limiting** | `slowapi` — 10 req/min per IP on `/api/analyze` | DDoS, API quota exhaustion |
-| **CORS Restriction** | Explicit allowlist (`localhost:3000`, production URL only) | Cross-origin attacks from arbitrary domains |
+| **CORS Restriction** | Explicit allowlist (`localhost:3000` + Vercel URL only) | Cross-origin attacks from arbitrary domains |
 | **File Type Validation** | Content-type check: `image/jpeg`, `image/png`, `image/webp` only | Arbitrary file injection into vision agent |
 | **File Size Cap** | Hard 5MB limit, rejected before agent pipeline runs | Memory exhaustion attacks |
 | **Path Traversal Guard** | `os.path.basename(file.filename)` on every upload | `../../server.py` overwrite attacks |
@@ -213,7 +215,7 @@ Iteration 2 (with Critic's reasoning injected into Risk's context):
 ```
 
 - **Max 2 iterations** — prevents infinite cycling
-- **Critic feedback is injected** as `critic_override_reasoning` into Risk's next prompt
+- **Critic feedback injected** as `critic_override_reasoning` into Risk's next prompt
 - **Commander only receives** the final consensus output — never an intermediate draft
 
 ---
@@ -223,15 +225,15 @@ Iteration 2 (with Critic's reasoning injected into Risk's context):
 | Concept | Implementation | Evidence |
 |---|---|---|
 | **Multi-Agent System** | 4-agent topology with iterative consensus debate loop | `server.py` — `while iteration < MAX_ITERATIONS` |
-| **Real MCP Server** | `mcp_server.py` — FastMCP, `@mcp.tool()`, `stdio` transport, JSON-RPC protocol | `mcp_server.py` + `get_telemetry_via_mcp()` in `server.py` |
-| **Deployability** | Dockerfile included, Cloud Run ready, `uvicorn` production config | `Dockerfile` in root |
-| **Security Features** | Rate limiting, CORS, file validation, path traversal guard, privacy cleanup | `server.py` security section + `test_main.py` |
-| **Computer Vision** | Scout Agent: Gemini vision model extracts structured spatial data from raw pixels | `agents/scout.py` |
-| **Testing** | 8 pytest tests covering security, parsing, and edge cases | `test_main.py` |
+| **Real MCP Server** | `mcp_server.py` — FastMCP, `@mcp.tool()`, `stdio` transport, JSON-RPC | `mcp_server.py` + `get_telemetry_via_mcp()` in `server.py` |
+| **Deployability** | Live on Vercel + Hugging Face Docker Spaces | [aegis-swarm-tan.vercel.app](https://aegis-swarm-tan.vercel.app) |
+| **Security Features** | Rate limiting, CORS, file validation, path traversal guard, privacy cleanup | `server.py` + `test_main.py` |
+| **Computer Vision** | Scout: Gemini vision model → structured Pydantic schema output | `agents/scout.py` |
+| **Testing** | 8 pytest tests — security + parsing edge cases | `test_main.py` |
 
 ---
 
-## 🚀 Local Installation
+## 🚀 Installation
 
 ### Prerequisites
 
@@ -260,7 +262,6 @@ python server.py
 
 ```bash
 cd aegis-frontend
-
 npm install
 npm run dev
 ```
@@ -273,17 +274,14 @@ npm run dev
 pytest test_main.py -v
 ```
 
-### 4. Docker Deployment
+### 4. Docker
 
 ```bash
-# Build the container
 docker build -t aegis-swarm .
-
-# Run locally
 docker run -p 8000:8000 --env-file .env aegis-swarm
 ```
 
-### 5. Batch Processing (offline)
+### 5. Batch Processing
 
 ```bash
 # Drop images into test_images/, reports saved to outputs/
@@ -323,4 +321,5 @@ AEGIS-SWARM/
 <img src="https://img.shields.io/badge/Stack-Gemini_2.5_Flash-4285F4?style=for-the-badge&logo=google&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/Protocol-Real_MCP_stdio-FF9800?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/Tests-8_Passing-43A047?style=for-the-badge&labelColor=0D1117"/>
+<img src="https://img.shields.io/badge/Live-Deployed-00C2FF?style=for-the-badge&labelColor=0D1117"/>
 </p>
