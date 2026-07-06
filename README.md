@@ -41,6 +41,11 @@ Every recommendation is debated, challenged, validated against a **real MCP prot
 | **Frontend (Command Dashboard)** | Vercel | [aegis-swarm-tan.vercel.app](https://aegis-swarm-tan.vercel.app) |
 | **Backend API (Swarm Engine)** | Hugging Face Spaces (Docker) | [coderudra-x-aegis-swarm-backend.hf.space](https://coderudra-x-aegis-swarm-backend.hf.space/api/analyze) |
 
+> ⚠️ **Best experienced on desktop.** The Command 
+> Dashboard is optimized for 1280px+ screen width. 
+> Mobile browsers may have layout limitations.
+> Open on laptop/PC for full experience.
+
 ---
 
 ## 🎥 The Command Center in Action
