@@ -32,6 +32,7 @@ AEGIS-SWARM is a custom-built multi-agent orchestration framework for **consensu
 
 Every recommendation is debated, challenged, validated against a **real MCP protocol server** and live environmental telemetry, then — and only then — executed.
 
+> **AEGIS-SWARM isn't an AI that tries to be smarter than other models. It's an engineering system designed to reduce the risk of acting on a single AI's mistake through consensus-driven reasoning, external evidence, and transparent decision validation.**
 ---
 
 ## 🌐 Live Demo
