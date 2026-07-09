@@ -51,7 +51,7 @@ Every recommendation is debated, challenged, validated against a **real MCP prot
 
 ## 🎥 The Command Center in Action
 
-[![AEGIS-SWARM Pitch](https://img.shields.io/badge/YouTube-Watch_Pitch_Video-FF0000?style=for-the-badge&logo=youtube)](YOUR_YOUTUBE_LINK_HERE)
+[![AEGIS-SWARM Pitch](https://img.shields.io/badge/YouTube-Watch_Pitch_Video-FF0000?style=for-the-badge&logo=youtube)](https://youtu.be/Hn5yP2FG8P4?si=muA6t49xStRKDXZY)
 
 ---
 
