@@ -9,3 +9,4 @@ slowapi    # For Rate limiting (Security)
 pytest     # For Testing 
 httpx      # For API calls and testing
 mcp        # For Model Control Protocol
+caspian-sdk
