@@ -1,6 +1,6 @@
 """
 AEGIS-SWARM :: Test Suite
-==========================
+===========================
 WHY THESE TESTS EXIST (design decision):
 Each test targets a specific security or behavioral guarantee of the system.
 Tests are grouped by what they protect against:

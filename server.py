@@ -14,10 +14,16 @@ from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+<<<<<<< HEAD
 # CASPIAN SDK IMPORT
 from caspian_sdk import CommClient
 
 # MODULAR AGENT IMPORTS
+=======
+# ===========================================
+# 1. MODULAR AGENT IMPORTS
+# ==========================================
+>>>>>>> 61961422678ae00aaf21d1f4b7e4e71184d486f0
 from agents.scout import analyze_crowd_frame
 from agents.risk import evaluate_risk
 from agents.critic import challenge_risk_assessment
