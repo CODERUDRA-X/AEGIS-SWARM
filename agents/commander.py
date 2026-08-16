@@ -1,6 +1,6 @@
 """
 AEGIS-SWARM :: Commander Agent
-================================
+=================================
 ROLE: Final decision-maker. Receives the Critic's consensus-validated
 threat assessment and generates a specific, actionable response plan.
 
