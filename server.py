@@ -14,16 +14,10 @@ from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-<<<<<<< HEAD
 # CASPIAN SDK IMPORT
 from caspian_sdk import CommClient
 
 # MODULAR AGENT IMPORTS
-=======
-# ===========================================
-# 1. MODULAR AGENT IMPORTS
-# ==========================================
->>>>>>> 61961422678ae00aaf21d1f4b7e4e71184d486f0
 from agents.scout import analyze_crowd_frame
 from agents.risk import evaluate_risk
 from agents.critic import challenge_risk_assessment
@@ -162,7 +156,7 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
         plan_out = generate_action_plan(json.dumps(critic_json))
         commander_json = safe_json_parse(plan_out, {"immediate_actions": ["Review logs.", "", ""]})
         
-       # PROACTIVE DISPATCH LOGIC
+        # PROACTIVE DISPATCH LOGIC
         final_threat = critic_json.get("adjusted_threat_level", "STANDBY")
         if final_threat in ["HIGH", "CRITICAL"]:
             print(f"🚀 [CASPIAN] High threat ({final_threat}). Initiating proactive dispatch...")
@@ -171,12 +165,13 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
                 from caspian_sdk import CommClient
                 dispatch_client = CommClient()
 
-                # Connect channels securely
+                # Connect channels
                 tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
                 if tg_token:
                     dispatch_client.connect_telegram(bot_token=tg_token)
                 dispatch_client.connect_email(display_name="AEGIS-SWARM Safety Agent")
 
+                # Prepare alert message
                 actions_text = "\n".join([f"  {i+1}. {act}" for i, act in enumerate(commander_json.get("immediate_actions", []))])
                 alert_msg = (
                     f"🚨 AEGIS-SWARM EMERGENCY ALERT 🚨\n"
@@ -188,14 +183,16 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
                     f"🌐 View Live HQ: https://aegis-swarm-tan.vercel.app/"
                 )
 
+                # Shoot to Telegram
                 tg_chat_id = os.environ.get("DISPATCH_TELEGRAM_CHAT_ID")
                 if tg_chat_id:
-                    dispatch_client.send_message(to=tg_chat_id, text=alert_msg)
+                    dispatch_client.send_message(tg_chat_id, alert_msg)
                     print("   ✓ [CASPIAN] Dispatched to Telegram.")
 
+                # Shoot to Email
                 admin_email = os.environ.get("DISPATCH_ADMIN_EMAIL")
                 if admin_email:
-                    dispatch_client.send_message(to=admin_email, text=alert_msg)
+                    dispatch_client.send_message(admin_email, alert_msg)
                     print("   ✓ [CASPIAN] Dispatched to HQ Email.")
 
             except Exception as dispatch_err:
