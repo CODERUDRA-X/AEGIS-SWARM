@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-# ==========================================
+# ===========================================
 # 1. MODULAR AGENT IMPORTS
 # ==========================================
 from agents.scout import analyze_crowd_frame
