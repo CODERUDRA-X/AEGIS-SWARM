@@ -347,10 +347,10 @@ export default function AegisDashboard() {
 
     try {
       // 1. FIX: Explicitly forcing localhost
-      const res = await fetch("http://localhost:8000/api/analyze", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch("https://coderudra-x-aegis-swarm-backend.hf.space/api/analyze", {
+  method: "POST",
+  body: formData,
+});
 
       const data = await res.json();
       
