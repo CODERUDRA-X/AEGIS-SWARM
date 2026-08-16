@@ -126,7 +126,7 @@ when in doubt about a PEDESTRIAN scene, escalate. That bias does not extend to s
 are not pedestrian crowd-crush scenarios in the first place."""
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash-lite",
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",

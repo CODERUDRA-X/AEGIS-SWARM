@@ -121,7 +121,7 @@ that feedback before responding.
 Provide a 1-sentence reason that explicitly references the data points driving your conclusion."""
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash-lite",
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",

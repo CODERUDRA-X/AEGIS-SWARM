@@ -127,7 +127,7 @@ safety systems will interpret this data -- a stopped car is not a person trapped
 so classify carefully and do not default to "pedestrian" when the scene is clearly traffic."""
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.5-flash-lite",
             contents=[uploaded_file, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
