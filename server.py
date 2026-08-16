@@ -161,12 +161,15 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
         if final_threat in ["HIGH", "CRITICAL"]:
             print(f"🚀 [CASPIAN] High threat ({final_threat}). Initiating proactive dispatch...")
             try:
-                # --- 🚨 CRITICAL FIX: CONNECT CHANNELS IN SERVER.PY BEFORE SENDING ---
+                # Fresh client instance to avoid async clashes
+                from caspian_sdk import CommClient
+                dispatch_client = CommClient()
+
+                # Connect channels securely
                 tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
                 if tg_token:
-                    caspian_client.connect_telegram(bot_token=tg_token)
-                caspian_client.connect_email(display_name="AEGIS-SWARM Safety Agent")
-                # ---------------------------------------------------------------------
+                    dispatch_client.connect_telegram(bot_token=tg_token)
+                dispatch_client.connect_email(display_name="AEGIS-SWARM Safety Agent")
 
                 actions_text = "\n".join([f"  {i+1}. {act}" for i, act in enumerate(commander_json.get("immediate_actions", []))])
                 alert_msg = (
@@ -181,12 +184,12 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
 
                 tg_chat_id = os.environ.get("DISPATCH_TELEGRAM_CHAT_ID")
                 if tg_chat_id:
-                    caspian_client.send_message(to=tg_chat_id, text=alert_msg)
+                    dispatch_client.send_message(to=tg_chat_id, text=alert_msg)
                     print("   ✓ [CASPIAN] Dispatched to Telegram.")
 
                 admin_email = os.environ.get("DISPATCH_ADMIN_EMAIL")
                 if admin_email:
-                    caspian_client.send_message(to=admin_email, text=alert_msg)
+                    dispatch_client.send_message(to=admin_email, text=alert_msg)
                     print("   ✓ [CASPIAN] Dispatched to HQ Email.")
 
             except Exception as dispatch_err:
