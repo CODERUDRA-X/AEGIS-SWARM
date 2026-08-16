@@ -19,6 +19,21 @@ low enough to keep threat classifications stable and reproducible.
 Higher temperature would produce inconsistent HIGH/CRITICAL flipping
 across identical inputs, which undermines the debate loop's reliability.
 
+WHY threat_level IS A Literal, NOT A str (bug fix -- confirmed 16-08-2026):
+A live test on a vehicular traffic scene produced a threat_level of
+"CATASTROPHIC" -- a tier that does not exist anywhere in this system's
+design. The original schema declared threat_level as a plain `str` with
+only a comment listing the intended four values; a comment is not an
+enforced constraint, so nothing stopped the model from inventing a fifth
+tier when its escalation-biased prompt ("under-reporting costs lives,
+when in doubt escalate") pushed it past CRITICAL on an unusually
+alarming-looking scene. Literal["LOW","MEDIUM","HIGH","CRITICAL"]
+compiles down to a JSON schema enum constraint that Gemini's controlled
+generation must sample from -- this makes a 5th invented tier
+structurally impossible, not just discouraged by prompt wording. This
+is a stronger, more general fix than any single-scenario prompt patch:
+it closes the loophole for every future edge case, not just this one.
+
 WHY ONLY 4 THREAT LEVELS (design decision):
 LOW/MEDIUM/HIGH/CRITICAL maps directly to standard incident command
 system (ICS) protocols used by real crowd safety personnel. This makes
@@ -27,6 +42,7 @@ just meaningful to an AI.
 """
 
 import os
+from typing import Literal
 from google import genai
 from google.genai import types
 from pydantic import BaseModel
@@ -35,12 +51,13 @@ from pydantic import BaseModel
 class RiskAssessment(BaseModel):
     """
     Output contract for the Risk Agent.
-    - threat_level: must be one of LOW, MEDIUM, HIGH, CRITICAL
-      (constrained by the prompt; Pydantic enforces string type)
+    - threat_level: constrained to exactly these 4 values by the type
+      system itself -- Gemini's structured output cannot generate
+      anything outside this set, regardless of how the prompt is worded.
     - reason: single-sentence justification citing specific data points
       from Scout's report -- makes the reasoning auditable
     """
-    threat_level: str   # LOW | MEDIUM | HIGH | CRITICAL
+    threat_level: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
     reason: str         # One sentence, citing specific Scout observations
 
 
@@ -75,11 +92,27 @@ Input data from Scout and context:
 Your task:
 Determine the threat level (LOW, MEDIUM, HIGH, or CRITICAL) for crowd crush or stampede risk.
 
-Threat level guidelines:
+CRITICAL CONTEXT RULE -- read scene_category before scoring:
+This system's threat scale exists to assess PEDESTRIAN crowd-crush and stampede risk.
+- If scene_category is "vehicular" (a traffic jam, parked vehicles, highway congestion) and
+  there is no direct evidence of a life-threatening incident (active fire, structural collapse,
+  a trapped ambulance, visible collision with injuries), do NOT apply pedestrian crowd-crush
+  thresholds. A stopped car is not a person trapped in a crush. Standard traffic congestion,
+  however dense-looking, should not exceed LOW unless direct hazard evidence is present.
+- If scene_category is "pedestrian" or "mixed" with meaningful pedestrian presence, apply full
+  crowd-safety scrutiny as normal.
+- If scene_category is "unclear", treat the scene cautiously as if pedestrian until evidence
+  clarifies otherwise -- do not use "unclear" as a reason to under-report.
+
+Threat level guidelines (for pedestrian/mixed scenes):
 - LOW: sparse density, open environment, no significant hazards
 - MEDIUM: moderate density OR one environmental risk factor present
 - HIGH: dense crowd OR multiple hazard factors OR restricted environment (stairs, corridors)
 - CRITICAL: critical density AND restricted environment AND multiple hazard factors
+
+There is no tier above CRITICAL. If a scene seems to warrant more concern than CRITICAL
+already implies, CRITICAL is still the correct and final answer -- describe the added
+severity in your reasoning text instead of inventing a new label.
 
 If a "critic_override_reasoning" field is present in the input, this means a previous
 assessment was challenged. You MUST carefully re-evaluate your threat level in light of

@@ -22,6 +22,7 @@ debated before agreeing on, not a single model's first guess."
 
 import os
 import json
+import base64
 import requests
 from dotenv import load_dotenv
 from caspian_sdk import CommClient
@@ -52,36 +53,48 @@ def safe_parse(text: str, fallback: dict) -> dict:
         return fallback
 
 
-def download_image(url: str, dest_path: str = "temp_uploads/incoming.jpg") -> str:
+def get_image_bytes(message) -> bytes | None:
     """
-    Caspian message attachments arrive as URLs (Telegram photo / email
-    attachment), not local file paths. Scout Agent expects a local file
-    path, so we download the attachment once before running the pipeline.
+    Returns raw image bytes from a message, handling BOTH media delivery
+    styles Caspian uses across channels -- confirmed via live testing on
+    15-08-2026:
+      - Telegram: media item carries a 'url' to download (with a known
+        Caspian bug where the slash between 'org' and 'file' is missing
+        -- repaired below before requesting).
+      - Email: media item carries the image inline as base64 in a
+        'data' field -- no HTTP request needed, just decode it.
     """
-    os.makedirs("temp_uploads", exist_ok=True)
-    response = requests.get(url, timeout=15)
-    response.raise_for_status()
-    with open(dest_path, "wb") as f:
-        f.write(response.content)
-    return dest_path
+    media = getattr(message, "media", None)
+    if not media:
+        return None
 
+    item = media[0] if isinstance(media, (list, tuple)) else media
+    if not isinstance(item, dict):
+        return None
 
-def extract_image_url(message) -> str | None:
-    """
-    NOTE: The exact attribute Caspian uses for attachments is not
-    confirmed in the public docs at the time of writing. Rather than
-    guess one name and risk an AttributeError crash, this checks every
-    plausible field defensively. Run this once locally and print
-    vars(message) on a real incoming message to confirm the true name,
-    then trim this list down to just that one.
-    """
-    for attr in ("attachments", "files", "media", "images"):
-        value = getattr(message, attr, None)
-        if value:
-            item = value[0]
-            # Item might be an object with .url, or a plain string URL.
-            return getattr(item, "url", item)
+    # Email path -- inline base64, no download required.
+    if item.get("data"):
+        return base64.b64decode(item["data"])
+
+    # Telegram path -- URL to download, with the known slash-bug repaired.
+    url = item.get("url") or item.get("file_url")
+    if url:
+        if "telegram.orgfile" in url:
+            url = url.replace("telegram.orgfile", "telegram.org/file")
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+        return response.content
+
     return None
+
+
+def save_image_bytes(data: bytes, dest_path: str = "temp_uploads/incoming.jpg") -> str:
+    """Writes raw image bytes (from either channel) to a local path --
+    Scout Agent expects a local file path, not bytes or a URL."""
+    os.makedirs("temp_uploads", exist_ok=True)
+    with open(dest_path, "wb") as f:
+        f.write(data)
+    return dest_path
 
 
 def run_aegis_pipeline_text_only(description: str) -> str:
@@ -124,6 +137,9 @@ def run_aegis_pipeline_text_only(description: str) -> str:
         f"Note: this assessment is based on your text description only. "
         f"Send a photo for a more precise vision-based analysis."
     )
+
+
+def run_aegis_pipeline(image_path: str) -> str:
     """
     Runs the exact same consensus debate loop as server.py, but returns
     a plain-text summary suitable for a chat/email reply instead of raw
@@ -189,11 +205,11 @@ def run_aegis_pipeline_text_only(description: str) -> str:
 # ================================================================
 @client.on_message
 def handle(message):
-    image_url = extract_image_url(message)
+    image_data = get_image_bytes(message)
 
     try:
-        if image_url:
-            local_path = download_image(image_url)
+        if image_data:
+            local_path = save_image_bytes(image_data)
             report = run_aegis_pipeline(local_path)
             message.reply(report)
         elif message.text and message.text.strip():
@@ -227,4 +243,15 @@ if __name__ == "__main__":
     print(f"AEGIS-SWARM is live. Email it at: {email_inbox['address']}")
     print("AEGIS-SWARM is live on Telegram.")
 
-    client.listen()  # one loop, both channels, one handler
+    # AUTO-RECOVERY WRAPPER:
+    # client.listen() long-polls Caspian's gateway. This connection can be
+    # forcibly closed by the OS/network after a while (WinError 10054).
+    # Rather than let one dropped connection kill the agent, we catch it and reconnect.
+    import time
+    while True:
+        try:
+            client.listen()  # one loop, both channels, one handler
+        except Exception as e:
+            print(f"\n[AEGIS-SWARM] Network connection dropped ({e}).")
+            print("[AEGIS-SWARM] Auto-reconnecting in 3 seconds...\n")
+            time.sleep(3)
