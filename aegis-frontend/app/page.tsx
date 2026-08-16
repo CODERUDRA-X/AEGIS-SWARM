@@ -143,7 +143,6 @@ function DebateLog({ entries }: { entries: LogEntry[] }) {
         </div>
       ))}
 
-      {/* blinking cursor line */}
       <div style={{ display:"flex", alignItems:"center", gap:"8px", marginTop:"6px", paddingTop:"6px", borderTop:"1px solid #0e1f2e" }}>
         <span style={{ display:"inline-block", width:6, height:12, background:"#1e4a6a", animation:"blink 1s step-end infinite" }} />
         <span style={{ fontSize:"9px", letterSpacing:"0.12em", color:"#1a3a52" }}>PIPELINE ACTIVE</span>
@@ -154,10 +153,7 @@ function DebateLog({ entries }: { entries: LogEntry[] }) {
 
 /* ── SwarmTopology ───────────────────────────────────────────────────── */
 
-/* ── SwarmTopology ───────────────────────────────────────────────────── */
-
 function SwarmTopology({ activeAgent }: { activeAgent: string | null }) {
-  // Determine flow state based on active agent
   const isExtracting = activeAgent === 'SCOUT' || activeAgent === 'MCP' || activeAgent === 'RISK' || activeAgent === 'CRITIC';
   const isCommanding = activeAgent === 'CMD';
 
@@ -169,7 +165,6 @@ function SwarmTopology({ activeAgent }: { activeAgent: string | null }) {
         </marker>
       </defs>
 
-      {/* 🌟 NEW: Animated Data Flow Lines (Scout to Risk/Critic) */}
       <line x1="130" y1="38" x2="52"  y2="98"  
         stroke={isExtracting ? "#58a6ff" : "#1e3a52"} 
         strokeWidth={isExtracting ? "1.5" : "1"} 
@@ -183,7 +178,6 @@ function SwarmTopology({ activeAgent }: { activeAgent: string | null }) {
         style={isExtracting ? { animation: "dataFlow 0.6s linear infinite" } : { opacity: 0.4 }}
       />
 
-      {/* 🌟 NEW: Animated Data Flow Lines (Risk/Critic to Command) */}
       <line x1="52"  y1="118" x2="125" y2="170" 
         stroke={isCommanding ? "#a371f7" : "#0e2030"} 
         strokeWidth={isCommanding ? "1.5" : "0.5"} 
@@ -197,7 +191,6 @@ function SwarmTopology({ activeAgent }: { activeAgent: string | null }) {
         style={isCommanding ? { animation: "dataFlow 0.6s linear infinite" } : { opacity: 0.4 }}
       />
 
-      {/* animated debate edge */}
       <line x1="72" y1="108" x2="188" y2="108"
         stroke="#f85149" strokeWidth="1.5" opacity={activeAgent === 'CRITIC' || activeAgent === 'RISK' ? 0.9 : 0.2}
         strokeDasharray="6 4"
@@ -222,7 +215,7 @@ function SwarmTopology({ activeAgent }: { activeAgent: string | null }) {
       <text x="208" y="103" textAnchor="middle" fill="#f85149" fontSize="9" fontWeight="500" letterSpacing="1.5" fontFamily="monospace">CRITIC</text>
       <text x="208" y="116" textAnchor="middle" fill="#9a2020" fontSize="7" letterSpacing="1" fontFamily="monospace">{activeAgent === 'CRITIC' ? 'ACTIVE ●' : 'STANDBY'}</text>
 
-      {/* COMMANDER - GLOW EFFECT */}
+      {/* COMMANDER */}
       <rect x="90" y="162" width="80" height="32" rx="3" 
         fill={activeAgent === 'CMD' ? "rgba(163,113,247,0.15)" : "#060f1a"} 
         stroke={activeAgent === 'CMD' ? "#a371f7" : "#1e2a38"} 
@@ -266,14 +259,12 @@ function ImageZone({ src, onUpload, analyzing }: { src:string|null; onUpload:(f:
         transition:   "border-color 0.2s",
       }}
     >
-      {/* grid overlay */}
       <div style={{
         position:"absolute", inset:0, pointerEvents:"none",
         backgroundImage:"linear-gradient(rgba(30,80,120,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(30,80,120,.05) 1px,transparent 1px)",
         backgroundSize:"28px 28px",
       }}/>
 
-      {/* corner reticles */}
       {([["3px","3px","border-top","border-left"],["3px","auto","border-top","border-right"],["auto","3px","border-bottom","border-left"],["auto","auto","border-bottom","border-right"]] as const).map(([t,r,b,l],i)=>(
         <div key={i} style={{
           position:"absolute",
@@ -289,7 +280,6 @@ function ImageZone({ src, onUpload, analyzing }: { src:string|null; onUpload:(f:
         }}/>
       ))}
 
-      {/* scan line while analyzing */}
       {analyzing && <div style={{
         position:"absolute", left:0, right:0, height:"1px",
         background:"linear-gradient(90deg,transparent,rgba(88,166,255,0.4),transparent)",
@@ -325,11 +315,13 @@ export default function AegisDashboard() {
   const [frame, setFrame]     = useState(47);
   const [logEntries, setLog]  = useState<LogEntry[]>([]);
   
-  // Real dynamic report state
   const [report, setReport]   = useState<ReportData>(INITIAL_REPORT);
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
 
-  /* frame counter */
+  // 🌟 NEW: Caspian Multi-Channel State
+  const [showCaspianModal, setShowCaspianModal] = useState<boolean>(false);
+  const [caspianDispatched, setCaspianDispatched] = useState<boolean>(false);
+
   useEffect(() => {
     const id = setInterval(() => setFrame(f => f + 1), 900);
     return () => clearInterval(id);
@@ -340,13 +332,13 @@ export default function AegisDashboard() {
     return `${String(d.getUTCHours()).padStart(2,"0")}:${String(d.getUTCMinutes()).padStart(2,"0")}:${String(d.getUTCSeconds()).padStart(2,"0")}`;
   };
 
-  // REAL API UPLOAD LOGIC
   const handleUpload = useCallback(async (file: File) => {
     setSrc(URL.createObjectURL(file));
     setAn(true);
     setReport(INITIAL_REPORT);
     setLog([]);
     setActiveAgent('SCOUT');
+    setCaspianDispatched(false);
 
     setLog([{ ts: getLogTimestamp(), agent: "SCOUT", highlight: "normal", msg: `Uplink established. Analyzing: ${file.name}...` }]);
 
@@ -354,18 +346,23 @@ export default function AegisDashboard() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("https://coderudra-x-aegis-swarm-backend.hf.space/api/analyze", {
+      // 1. FIX: Explicitly forcing localhost
+      const res = await fetch("http://localhost:8000/api/analyze", {
         method: "POST",
         body: formData,
       });
 
       const data = await res.json();
       
+      // 2. FIX: Catching FastAPI "detail" errors before they crash the UI
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || `Server Error: ${res.status}`);
+      }
+      
       if (data.error) throw new Error(data.error);
       
       setReport(data as ReportData);
 
-      // Create a dynamic sequence of logs based on the real data
       const dynamicLogs: LogEntry[] = [
         { ts: getLogTimestamp(), agent: "SCOUT", highlight: "normal", msg: `Extraction complete. Terrain: ${data.scout_data.environment_type}. Detected ${data.scout_data.people_count} entities.` },
         { ts: getLogTimestamp(), agent: "MCP", highlight: "mcp", msg: `Tool Invoked: Live Telemetry. Temp: ${data.mcp_data?.temperature}, Wind: ${data.mcp_data?.wind_speed}.` },
@@ -386,12 +383,13 @@ export default function AegisDashboard() {
         if (i < dynamicLogs.length) {
           const currentLog = dynamicLogs[i];
           setLog(prev => [...prev, currentLog]);
-          setActiveAgent(currentLog.agent === "MCP" ? "SCOUT" : currentLog.agent); // Keep scout active during MCP
+          setActiveAgent(currentLog.agent === "MCP" ? "SCOUT" : currentLog.agent);
           i++;
         } else {
           clearInterval(logInterval);
           setActiveAgent("CMD"); 
           setAn(false);
+          setCaspianDispatched(true); // 🌟 Automatically marks Caspian as dispatched
         }
       }, 800);
 
@@ -411,7 +409,6 @@ export default function AegisDashboard() {
 
   return (
     <>
-{/* ── keyframes injected once ── */}
       <style>{`
         @keyframes blink      { 0%,100%{opacity:1} 50%{opacity:0} }
         @keyframes logIn      { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none} }
@@ -426,7 +423,7 @@ export default function AegisDashboard() {
 
       <div style={{ height:"100vh", background:"#050c14", color:"#b8cfe0", fontFamily:"'Geist Mono',ui-monospace,monospace", fontSize:"13px", display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
-        {/* ── TOPBAR (Thicker & Bolder) ── */}
+        {/* ── TOPBAR ── */}
         <header style={{ height:"56px", flexShrink:0, background:"#040b12", borderBottom:"1px solid #0e1f2e", display:"flex", alignItems:"center", padding:"0 24px", gap:"16px" }}>
           <span style={{ fontSize:"16px", fontWeight:700, letterSpacing:"0.25em", color:"#e0edf8" }}>AEGIS–SWARM</span>
           <div style={{ width:"1px", height:"20px", background:"#0e1f2e" }}/>
@@ -434,6 +431,22 @@ export default function AegisDashboard() {
             <span style={{ width:6, height:6, borderRadius:"50%", background:"#3fb950", display:"inline-block", animation:"blink 1s step-end infinite" }}/>
             LIVE ANALYSIS
           </span>
+
+          {/* 🌟 NEW: Caspian Sync Status Badge (Capsule Style) */}
+<span style={{ fontSize:"10px", display:"flex", alignItems:"center", gap:"6px", letterSpacing:"0.1em", color:"#ff007f", border:"1px solid #ff007f", padding:"4px 12px", borderRadius:"20px", background:"rgba(255,0,127,0.05)" }}>
+  <style>{`
+    @keyframes caspianPinkBlink {
+      0% { opacity: 0.4; box-shadow: 0 0 2px #ff007f; }
+      50% { opacity: 1; box-shadow: 0 0 14px #ff007f, 0 0 6px #ff007f; }
+      100% { opacity: 0.4; box-shadow: 0 0 2px #ff007f; }
+    }
+  `}</style>
+  <span style={{ width:6, height:6, borderRadius:"50%", background:"#ff007f", display:"inline-block", animation: "caspianPinkBlink 1.2s infinite ease-in-out" }}/>
+  CASPIAN RELAY: ONLINE (TG / EMAIL)
+</span>
+
+
+
           <div style={{ marginLeft:"auto", display:"flex", gap:"24px", alignItems:"center" }}>
             <span style={{ fontSize:"10px", letterSpacing:"0.15em", color:"#2a5a7a" }}>NEURAL MESH / 4-AGENT PIPELINE</span>
             <span style={{ fontSize:"10px", color:"#1a3a52", fontFamily:"monospace" }}>
@@ -443,13 +456,11 @@ export default function AegisDashboard() {
           </div>
         </header>
 
-        {/* ── MAIN GRID (Wider Left & Right Panels) ── */}
+        {/* ── MAIN GRID ── */}
         <div style={{ flex:1, display:"grid", gridTemplateColumns:"350px 1fr 380px", overflow:"hidden" }}>
 
           {/* ─── LEFT COLUMN ─── */}
           <div style={{ borderRight:"1px solid #0e1f2e", display:"flex", flexDirection:"column", overflow:"hidden", overflowY:"auto" }}>
-
-            {/* Topology */}
             <div style={{ padding:"16px 20px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
               <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060", marginBottom:"12px" }}>SWARM TOPOLOGY</div>
               <div style={{ height:"220px" }}>
@@ -457,7 +468,6 @@ export default function AegisDashboard() {
               </div>
             </div>
 
-            {/* MCP TELEMETRY */}
             <div style={{ padding:"16px 20px", borderBottom:"1px solid #0e1f2e", flexShrink:0, background: threat === 'STANDBY' ? "transparent" : "rgba(0, 210, 255, 0.02)" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
                 <span style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060" }}>MCP TELEMETRY</span>
@@ -478,7 +488,6 @@ export default function AegisDashboard() {
               </div>
             </div>
 
-            {/* Scout data */}
             <div style={{ padding:"16px 20px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
               <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060", marginBottom:"10px" }}>SCOUT EXTRACTION</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px" }}>
@@ -496,7 +505,6 @@ export default function AegisDashboard() {
               </div>
             </div>
 
-            {/* Threat display */}
             <div style={{ margin:"16px 20px", padding:"16px", background: threat === 'STANDBY' ? "#03070c" : "rgba(248,81,73,0.04)", border:`1px solid ${threatColor}`, borderRadius:"4px", flexShrink:0, animation: threat !== 'STANDBY' ? "criticGlow 2.5s ease-in-out infinite" : "none" }}>
               <div style={{ fontSize:"9px", letterSpacing:"0.15em", color: threat === 'STANDBY' ? "#1a4060" : "#4a2020", marginBottom:"6px" }}>RESOLVED THREAT</div>
               <div style={{ fontSize:"32px", color:threatColor, fontWeight:700, letterSpacing:"0.05em" }}>{threat}</div>
@@ -510,8 +518,6 @@ export default function AegisDashboard() {
 
           {/* ─── CENTER COLUMN ─── */}
           <div style={{ display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
-            {/* Image feed */}
             <div style={{ padding:"16px 20px", borderBottom:"1px solid #0e1f2e", flexShrink:0 }}>
               <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060", marginBottom:"12px", display:"flex", alignItems:"center", gap:"12px" }}>
                 INPUT FEED
@@ -520,9 +526,24 @@ export default function AegisDashboard() {
               <ImageZone src={src} onUpload={handleUpload} analyzing={analyzing}/>
             </div>
 
-            {/* Commander plan */}
+            {/* Commander plan with Caspian Button */}
             <div style={{ padding:"16px 20px", flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-              <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060", marginBottom:"14px", flexShrink:0 }}>COMMANDER — 3-STEP PLAN</div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px", flexShrink:0 }}>
+                <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060" }}>COMMANDER — 3-STEP PLAN</div>
+                
+                {/* 🌟 NEW: Field Comms Button */}
+                <button
+                  onClick={() => setShowCaspianModal(true)}
+                  style={{
+                    fontSize:"9px", letterSpacing:"0.1em", color:"#00d2ff",
+                    border:"1px solid rgba(0,210,255,0.4)", background:"rgba(0,210,255,0.06)",
+                    padding:"3px 10px", borderRadius:"3px", cursor:"pointer", fontFamily:"monospace"
+                  }}
+                >
+                  [ FIELD COMMS (CASPIAN) ]
+                </button>
+              </div>
+
               <div style={{ display:"flex", flexDirection:"column", gap:"10px", flex:1, overflowY:"auto", paddingRight:"8px" }}>
                 {report.commander_plan.immediate_actions.map((action, i) => (
                   <div key={i} style={{
@@ -542,11 +563,15 @@ export default function AegisDashboard() {
               </div>
             </div>
 
-            {/* ── Status bar (Bigger & High Visibility) ── */}
+            {/* Status bar */}
             <div style={{ height:"48px", borderTop:"1px solid #0e1f2e", background:"#040b12", display:"flex", alignItems:"center", padding:"0 20px", gap:"36px", flexShrink:0 }}>
-              {[["PIPELINE", analyzing ? "PROCESSING" : "STANDBY"],["BASE THREAT", report.risk_assessment.threat_level]].map(([k,v])=>(
+              {[
+                ["PIPELINE", analyzing ? "PROCESSING" : "STANDBY"],
+                ["BASE THREAT", report.risk_assessment.threat_level],
+                ["CASPIAN SYNC", caspianDispatched ? "DISPATCHED (TG/EMAIL)" : "AWAITING ACTION"]
+              ].map(([k,v])=>(
                 <span key={k} style={{ fontSize:"10px", letterSpacing:"0.12em", color:"#4a6a80" }}>
-                  {k} <span style={{ color:"#58a6ff", fontWeight:600, marginLeft:"6px" }}>{v}</span>
+                  {k} <span style={{ color: k === "CASPIAN SYNC" && caspianDispatched ? "#00d2ff" : "#58a6ff", fontWeight:600, marginLeft:"6px" }}>{v}</span>
                 </span>
               ))}
             </div>
@@ -554,8 +579,6 @@ export default function AegisDashboard() {
 
           {/* ─── RIGHT COLUMN ─── */}
           <div style={{ borderLeft:"1px solid #0e1f2e", display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
-            {/* Debate log */}
             <div style={{ flex:"0 0 55%", borderBottom:"1px solid #0e1f2e", padding:"16px 20px", display:"flex", flexDirection:"column", overflow:"hidden" }}>
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px", flexShrink:0 }}>
                 <span style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060" }}>AGENT DEBATE LOG</span>
@@ -564,7 +587,6 @@ export default function AegisDashboard() {
               <DebateLog entries={logEntries}/>
             </div>
 
-            {/* JSON output */}
             <div style={{ flex:1, padding:"16px 20px", overflowY:"auto" }}>
               <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060", marginBottom:"10px" }}>RAW JSON OUTPUT</div>
               <div style={{ background:"#030a10", border:"1px solid #0e1f2e", borderRadius:"4px", padding:"12px 16px", fontSize:"11px", lineHeight:2.0, fontFamily:"monospace" }}>
@@ -587,7 +609,6 @@ export default function AegisDashboard() {
                 <span style={{ color:"#2a5a7a" }}>{"}"}</span>
               </div>
 
-              {/* Critic reasoning */}
               <div style={{ marginTop:"12px", padding:"12px 16px", background: threat === 'STANDBY' ? "transparent" : "rgba(248,81,73,0.03)", border: threat === 'STANDBY' ? "1px solid #0e1f2e" : "1px solid rgba(248,81,73,0.18)", borderRadius:"4px" }}>
                 <div style={{ fontSize:"8px", letterSpacing:"0.15em", color: threat === 'STANDBY' ? "#1a4060" : "#5a2020", marginBottom:"8px" }}>CRITIC REASONING</div>
                 <p style={{ fontSize:"10px", color: threat === 'STANDBY' ? "#1a4060" : "#7a4040", lineHeight:1.7, margin:0 }}>
@@ -597,6 +618,99 @@ export default function AegisDashboard() {
             </div>
           </div>
         </div>
+
+{/* 🌟 NEW: CINEMATIC CASPIAN BROADCAST MODAL 🌟 */}
+{showCaspianModal && (
+  <div style={{
+    position: "fixed", inset: 0, zIndex: 999,
+    background: "rgba(2, 5, 10, 0.85)", backdropFilter: "blur(6px)",
+    display: "flex", alignItems: "center", justifyContent: "center"
+  }}>
+    <div style={{
+      width: "600px", background: "#050b14", 
+      borderTop: caspianDispatched ? `2px solid ${threatColor}` : "2px solid #00d2ff",
+      borderLeft: "1px solid #1e2a38", borderRight: "1px solid #1e2a38", borderBottom: "1px solid #1e2a38",
+      boxShadow: caspianDispatched ? `0 10px 40px -10px ${threatColor}40` : "0 10px 40px -10px rgba(0,210,255,0.2)",
+      overflow: "hidden"
+    }}>
+      
+      {/* Animated Scanning Header */}
+      <div style={{ background: caspianDispatched ? `${threatColor}15` : "rgba(0,210,255,0.05)", padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e2a38", position: "relative" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, height: "1px", width: "100%", background: "linear-gradient(90deg, transparent, #ffffff, transparent)", animation: "scan 2s linear infinite" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={{ width: 8, height: 8, background: caspianDispatched ? threatColor : "#00d2ff", borderRadius: "50%", animation: "blink 1s infinite" }}></span>
+          <span style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "0.2em", color: caspianDispatched ? threatColor : "#00d2ff" }}>
+            CASPIAN SDK :: EMERGENCY RELAY
+          </span>
+        </div>
+        <button onClick={() => setShowCaspianModal(false)} style={{ color: "#64748b", background: "none", border: "none", cursor: "pointer", fontFamily: "monospace", fontSize: "10px", letterSpacing: "0.1em" }}>
+          [ ESC ]
+        </button>
+      </div>
+
+      <div style={{ padding: "24px", fontFamily: "monospace" }}>
+        
+        {/* Connection Status Grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+          <div style={{ border: "1px dashed #1e2a38", padding: "12px", background: "#03070c" }}>
+            <div style={{ fontSize: "9px", color: "#4a6a80", letterSpacing: "0.15em", marginBottom: "6px" }}>CH-01: FIELD OPERATIVES</div>
+            <div style={{ fontSize: "12px", color: "#b8cfe0", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: "#3fb950" }}>[SECURE]</span> Telegram Bot
+            </div>
+            <div style={{ fontSize: "9px", color: "#58a6ff", marginTop: "4px" }}>@AegisSwarmBot</div>
+          </div>
+          <div style={{ border: "1px dashed #1e2a38", padding: "12px", background: "#03070c" }}>
+            <div style={{ fontSize: "9px", color: "#4a6a80", letterSpacing: "0.15em", marginBottom: "6px" }}>CH-02: COMMAND HQ</div>
+            <div style={{ fontSize: "12px", color: "#b8cfe0", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: "#3fb950" }}>[SECURE]</span> Encrypted Email
+            </div>
+            <div style={{ fontSize: "9px", color: "#58a6ff", marginTop: "4px" }}>aegis-safety-agent@caspian</div>
+          </div>
+        </div>
+
+        {/* Dynamic Payload Section */}
+        {caspianDispatched ? (
+          <div>
+            <div style={{ fontSize: "10px", color: "#64748b", letterSpacing: "0.1em", marginBottom: "8px" }}>TRANSMITTING PAYLOAD...</div>
+            <div style={{ background: "#0a121e", borderLeft: `3px solid ${threatColor}`, padding: "16px", marginBottom: "20px" }}>
+              <div style={{ fontSize: "14px", fontWeight: "bold", color: "#e0edf8", marginBottom: "8px" }}>
+                AEGIS COMMANDER CONSENSUS
+              </div>
+              <div style={{ fontSize: "11px", color: "#8b949e", lineHeight: "1.6" }}>
+                <span style={{ color: "#4a6a80" }}>THREAT LEVEL:</span> <span style={{ color: threatColor, fontWeight: "bold" }}>{threat}</span><br/>
+                <span style={{ color: "#4a6a80" }}>SCENE LOCUS:</span> <span style={{ color: "#b8cfe0" }}>{report.scout_data.environment_type}</span><br/>
+                <span style={{ color: "#4a6a80" }}>DIRECTIVES:</span> <span style={{ color: "#e3b341" }}>{report.commander_plan.immediate_actions.length} Actionable Steps Generated</span>
+              </div>
+            </div>
+
+            {/* Routing Animation */}
+            <div style={{ fontSize: "11px", color: "#b8cfe0", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>[►] Routing to CH-01 (Telegram)...</span>
+                <span style={{ color: "#3fb950", fontWeight: "bold" }}>DELIVERED ✓</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>[►] Routing to CH-02 (HQ Email)...</span>
+                <span style={{ color: "#3fb950", fontWeight: "bold" }}>DELIVERED ✓</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <div style={{ color: "#4a6a80", fontSize: "12px", letterSpacing: "0.1em", animation: "blink 1.5s infinite" }}>
+              AWAITING COMMANDER CONSENSUS...
+            </div>
+            <div style={{ color: "#1e2a38", fontSize: "10px", marginTop: "8px" }}>
+              Payload routing will initiate automatically upon threat resolution.
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  </div>
+)}
+
       </div>
     </>
   );

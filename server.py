@@ -10,13 +10,14 @@ from slowapi.errors import RateLimitExceeded
 import uvicorn
 from dotenv import load_dotenv
 
-# --- MCP CLIENT IMPORTS (REAL PROTOCOL) ---
+# MCP CLIENT IMPORTS
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-# ==========================================
-# 1. MODULAR AGENT IMPORTS
-# ==========================================
+# CASPIAN SDK IMPORT
+from caspian_sdk import CommClient
+
+# MODULAR AGENT IMPORTS
 from agents.scout import analyze_crowd_frame
 from agents.risk import evaluate_risk
 from agents.critic import challenge_risk_assessment
@@ -24,9 +25,9 @@ from agents.commander import generate_action_plan
 
 load_dotenv()
 
-# ==========================================
-# 2. SECURITY & INITIALIZATION
-# ==========================================
+# Initialize Caspian Client for outbound dispatch
+caspian_client = CommClient()
+
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="AEGIS-SWARM Orchestration Engine")
 app.state.limiter = limiter
@@ -45,7 +46,7 @@ app.add_middleware(
 )
 
 os.makedirs("temp_uploads", exist_ok=True)
-MAX_FILE_SIZE = 5 * 1024 * 1024 # 5 MB limits
+MAX_FILE_SIZE = 5 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"]
 
 def safe_json_parse(response_text: str, default_fallback: dict) -> dict:
@@ -58,41 +59,25 @@ def safe_json_parse(response_text: str, default_fallback: dict) -> dict:
         print(f"[ERROR] JSON Parsing Failed: {str(e)}")
         return default_fallback
 
-# ==========================================
-# 3. THE REAL MCP CLIENT INTEGRATION
-# ==========================================
 async def get_telemetry_via_mcp(lat: float = 34.0522, lon: float = -118.2437) -> dict:
-    """
-    REAL MCP CLIENT: Spins up the mcp_server.py as a subprocess, establishes
-    a stdio transport connection, and invokes the protocol-compliant tool.
-    """
-    print("📡 [MCP CLIENT] Establishing protocol connection to external tool server...")
+    print("📡 [MCP CLIENT] Establishing protocol connection...")
     
-    # Define the parameters to run our standalone MCP server
     server_params = StdioServerParameters(
-        command="python", # Assumes python is in the environment path
-        args=["mcp_server.py"], # The standalone MCP server we just created
+        command="python", 
+        args=["mcp_server.py"], 
         env=None
     )
 
     try:
-        # Establish the protocol connection using the official mcp SDK
         async with stdio_client(server_params) as (read, write):
             async with ClientSession(read, write) as session:
-                # Initialize the handshake
                 await session.initialize()
                 
-                # Call the specific tool registered in our MCP server
                 result = await session.call_tool(
                     "get_live_telemetry", 
                     arguments={"lat": lat, "lon": lon}
                 )
                 
-                # The MCP protocol returns content as a list of TextContent parts.
-                # Each part's .text field is a JSON-encoded string (not a Python repr),
-                # so we MUST use json.loads() here -- NOT ast.literal_eval().
-                # ast.literal_eval() would crash on valid JSON booleans (true/false/null)
-                # because Python uses True/False/None. This is a common MCP pitfall.
                 if result.content and len(result.content) > 0:
                     raw_data = result.content[0].text
                     return json.loads(raw_data)
@@ -103,20 +88,12 @@ async def get_telemetry_via_mcp(lat: float = 34.0522, lon: float = -118.2437) ->
         print(f"❌ [MCP CLIENT] Protocol communication failed: {e}")
         return {"source": "OFFLINE", "temperature": "N/A", "wind_speed": "N/A", "mcp_status": "Protocol Failure"}
 
-# ==========================================
-# 4. MAIN ORCHESTRATION PIPELINE
-# ==========================================
 @app.post("/api/analyze")
 @limiter.limit("10/minute") 
 async def analyze_incident(request: Request, file: UploadFile = File(...)):
-    
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="Invalid file type.")
 
-    # SECURITY: os.path.basename() strips any directory traversal sequences.
-    # Without this, a malicious filename like "../../server.py" could overwrite
-    # critical application files. basename() ensures only the final filename component
-    # is ever used, regardless of what the client sends.
     safe_filename = os.path.basename(file.filename)
     if not safe_filename:
         raise HTTPException(status_code=400, detail="Invalid filename.")
@@ -130,16 +107,13 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
         raise HTTPException(status_code=413, detail="File exceeds 5MB limit.")
 
     try:
-        # 1. SCOUT
         print("👀 [API] Running Scout Agent...")
         scout_out = analyze_crowd_frame(file_path)
         scout_json = safe_json_parse(scout_out, {"people_count": 0, "blocked_paths": 0, "environment_type": "Unknown", "hazard_factors": []})
         
-        # 2. REAL MCP TOOL CALL (Async execution)
         print("🌐 [API] Requesting Context Protocol Tools...")
         mcp_data = await get_telemetry_via_mcp()
         
-        # 3. THE DEBATE LOOP (Max 2 iterations to prevent infinite looping)
         MAX_ITERATIONS = 2
         iteration = 0
         consensus_reached = False
@@ -171,18 +145,53 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
             adjusted_risk_lvl = critic_json.get("adjusted_threat_level")
             
             if current_risk_lvl != adjusted_risk_lvl:
-                print(f"🔴 [DEBATE] Critic Overrode Risk! ({current_risk_lvl} -> {adjusted_risk_lvl}). Looping back...")
+                print(f"🔴 [DEBATE] Critic Overrode Risk! ({current_risk_lvl} -> {adjusted_risk_lvl})")
                 critic_feedback = critic_json.get("critic_reasoning")
                 iteration += 1
             else:
                 print("🟢 [DEBATE] Consensus Reached.")
                 consensus_reached = True
 
-        # 4. COMMANDER
         print("🛡️ [API] Running Commander Agent...")
         plan_out = generate_action_plan(json.dumps(critic_json))
         commander_json = safe_json_parse(plan_out, {"immediate_actions": ["Review logs.", "", ""]})
         
+       # PROACTIVE DISPATCH LOGIC
+        final_threat = critic_json.get("adjusted_threat_level", "STANDBY")
+        if final_threat in ["HIGH", "CRITICAL"]:
+            print(f"🚀 [CASPIAN] High threat ({final_threat}). Initiating proactive dispatch...")
+            try:
+                # --- 🚨 CRITICAL FIX: CONNECT CHANNELS IN SERVER.PY BEFORE SENDING ---
+                tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+                if tg_token:
+                    caspian_client.connect_telegram(bot_token=tg_token)
+                caspian_client.connect_email(display_name="AEGIS-SWARM Safety Agent")
+                # ---------------------------------------------------------------------
+
+                actions_text = "\n".join([f"  {i+1}. {act}" for i, act in enumerate(commander_json.get("immediate_actions", []))])
+                alert_msg = (
+                    f"🚨 AEGIS-SWARM EMERGENCY ALERT 🚨\n"
+                    f"{'='*30}\n"
+                    f"Scene: {scout_json.get('environment_type', 'Unknown')}\n"
+                    f"Threat Level: {final_threat}\n"
+                    f"Critic Reasoning: {critic_json.get('critic_reasoning', 'N/A')}\n\n"
+                    f"Commander Action Plan:\n{actions_text}\n\n"
+                    f"🌐 View Live HQ: https://aegis-swarm-tan.vercel.app/"
+                )
+
+                tg_chat_id = os.environ.get("DISPATCH_TELEGRAM_CHAT_ID")
+                if tg_chat_id:
+                    caspian_client.send_message(to=tg_chat_id, text=alert_msg)
+                    print("   ✓ [CASPIAN] Dispatched to Telegram.")
+
+                admin_email = os.environ.get("DISPATCH_ADMIN_EMAIL")
+                if admin_email:
+                    caspian_client.send_message(to=admin_email, text=alert_msg)
+                    print("   ✓ [CASPIAN] Dispatched to HQ Email.")
+
+            except Exception as dispatch_err:
+                print(f"   ❌ [CASPIAN ERROR] Dispatch failed: {dispatch_err}")
+
         final_report = {
             "image": safe_filename,
             "scout_data": scout_json,
@@ -191,10 +200,10 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
             "critic_review": critic_json,
             "commander_plan": commander_json
         }
-        
+
         print(f"✅ [API] Analysis complete.")
         return final_report
-        
+
     except Exception as e:
         print(f"❌ [API] System Failure: {str(e)}")
         return {"error": "Critical pipeline failure."}
