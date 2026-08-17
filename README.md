@@ -417,7 +417,6 @@ AEGIS-SWARM/
 *Building the future of AI, Vision Systems, and Defense-Tech.*
 
 <p align="center">
-<img src="https://img.shields.io/badge/Track-Agents_for_Good-00C2FF?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/Stack-Gemini_2.5_Flash-4285F4?style=for-the-badge&logo=google&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/Protocol-Real_MCP_stdio-FF9800?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/Tests-8_Passing-43A047?style=for-the-badge&labelColor=0D1117"/>
