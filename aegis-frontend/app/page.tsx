@@ -30,6 +30,7 @@ interface ReportData {
   risk_assessment:  { threat_level: string };
   critic_review:    { adjusted_threat_level: string; critic_reasoning: string };
   commander_plan:   { immediate_actions: string[] };
+  dispatch_status?: { telegram: boolean; email: boolean; errors: string[] };
 }
 
 /* ── Constants ───────────────────────────────────────────────────────── */
@@ -66,6 +67,11 @@ const INITIAL_REPORT: ReportData = {
       "Standby for agent routing...",
       "Maintain perimeter.",
     ],
+  },
+  dispatch_status: {
+    telegram: false,
+    email: false,
+    errors: [],
   },
 };
 
@@ -687,11 +693,21 @@ export default function AegisDashboard() {
             <div style={{ fontSize: "11px", color: "#b8cfe0", display: "flex", flexDirection: "column", gap: "8px" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>[►] Routing to CH-01 (Telegram)...</span>
-                <span style={{ color: "#3fb950", fontWeight: "bold" }}>DELIVERED ✓</span>
+                {/* Dynamic TG status */}
+                {report.dispatch_status?.telegram ? (
+                  <span style={{ color: "#3fb950", fontWeight: "bold" }}>DELIVERED ✓</span>
+                ) : (
+                  <span style={{ color: "#f85149", fontWeight: "bold" }}>FAILED ❌</span>
+                )}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>[►] Routing to CH-02 (HQ Email)...</span>
-                <span style={{ color: "#3fb950", fontWeight: "bold" }}>DELIVERED ✓</span>
+                {/* Dynamic Email status */}
+                {report.dispatch_status?.email ? (
+                  <span style={{ color: "#3fb950", fontWeight: "bold" }}>DELIVERED ✓</span>
+                ) : (
+                  <span style={{ color: "#f85149", fontWeight: "bold" }}>FAILED ❌</span>
+                )}
               </div>
             </div>
           </div>
