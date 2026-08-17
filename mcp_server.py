@@ -1,6 +1,6 @@
 """
 AEGIS-SWARM :: Live Telemetry MCP Server (Standalone Protocol Provider)
-======================================================================
+=======================================================================
 This script implements a REAL Model Context Protocol (MCP) server.
 It operates as an independent tool provider that communicates with the 
 AEGIS-SWARM orchestrator via JSON-RPC over stdio.
