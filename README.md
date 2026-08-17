@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-<img src="assets/demo.gif" width="100%">
+<img src="https://github.com/CODERUDRA-X/AEGIS-SWARM/blob/main/assets/demo.gif?raw=true" width="100%">
 </p>
 
 > **Most AI systems generate answers. AEGIS-SWARM generates trusted operational decisions.**
