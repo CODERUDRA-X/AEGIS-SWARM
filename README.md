@@ -19,6 +19,7 @@
 <img src="https://img.shields.io/badge/🛡️_TRUST-CRITIC_VALIDATED-43A047?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/🔒_SECURITY-PRODUCTION_HARDENED-8B0000?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/☁️_DEPLOY-LIVE_ON_VERCEL_%2B_HF-4285F4?style=for-the-badge&logo=vercel&labelColor=0D1117"/>
+<img src="https://img.shields.io/badge/📨_REACHABLE-CASPIAN_TELEGRAM_%2B_EMAIL-EC4899?style=for-the-badge&labelColor=0D1117"/>
 
 </p>
 
@@ -155,6 +156,8 @@ This means the telemetry provider is **fully decoupled** — swappable, independ
 
 ## ⚙️ Full System Architecture
 
+### 1. Infrastructure & Deployment Stack
+
 ```mermaid
 flowchart LR
     subgraph Frontend ["🖥️ Vercel — Command Center UI"]
@@ -186,6 +189,43 @@ flowchart LR
     Commander -->|"Structured JSON"| Next
 ```
 
+### 2. Logical Flow & Caspian Emergency Relay
+
+```mermaid
+graph TD
+    Input[Live Feed / Image Upload] --> Orchestrator[FastAPI Orchestration Engine]
+
+    Orchestrator -->|Visual Data| Scout[Scout Agent: Vision Extraction]
+
+    Scout -->|Structured JSON| Risk[Risk Agent: Baseline Evaluation]
+    Scout -->|Structured JSON| Critic[Critic Agent: Challenger]
+
+    External[External APIs / Sensors] <-->|JSON-RPC via stdio| MCP[MCP Server: Live Telemetry]
+    MCP -->|Environmental Context| Critic
+
+    Risk -->|Threat Level| Debate{Consensus Resolution}
+    Critic -->|Adjusted Threat Level| Debate
+
+    Debate -->|Mismatch or Override| Risk
+
+    Debate -->|Consensus Reached| CMD[Commander Agent: Action Plan]
+
+    CMD -->|Threat High or Critical| Caspian{Caspian Emergency Relay}
+
+    Caspian -->|Direct API Bypass| TG[Telegram: Field Operatives]
+    Caspian -->|Official Initiate Protocol| Email[Encrypted Email: Command HQ]
+    CMD -->|Threat Low or Medium| UI[Dashboard: Standby Mode]
+
+    classDef agent fill:#0a121e,stroke:#58a6ff,stroke-width:2px,color:#e0edf8;
+    classDef caspian fill:#1e0a14,stroke:#ff007f,stroke-width:2px,color:#ff007f;
+    classDef mcp fill:#0a1a1e,stroke:#00d2ff,stroke-width:2px,color:#00d2ff;
+    classDef debate fill:#1e0a0a,stroke:#f85149,stroke-width:2px,color:#f85149;
+
+    class Scout,Risk,Critic,CMD agent;
+    class Caspian,TG,Email caspian;
+    class MCP mcp;
+    class Debate debate;
+```
 ---
 
 ## 🔒 Security Architecture
@@ -226,16 +266,57 @@ Iteration 2 (with Critic's reasoning injected into Risk's context):
 
 ---
 
-## 🏆 Kaggle Rubric Fulfillment
+## 🏆 Caspian AI Hackathon Rubric Fulfillment
 
 | Concept | Implementation | Evidence |
 |---|---|---|
 | **Multi-Agent System** | 4-agent topology with iterative consensus debate loop | `server.py` — `while iteration < MAX_ITERATIONS` |
+| **Caspian SDK Integration** | Proactive emergency dispatch and multi-channel relay (Telegram & Email) | `server.py` (`dispatch_caspian_alert`) & `caspian_handler.py` |
 | **Real MCP Server** | `mcp_server.py` — FastMCP, `@mcp.tool()`, `stdio` transport, JSON-RPC | `mcp_server.py` + `get_telemetry_via_mcp()` in `server.py` |
 | **Deployability** | Live on Vercel + Hugging Face Docker Spaces | [aegis-swarm-tan.vercel.app](https://aegis-swarm-tan.vercel.app) |
 | **Security Features** | Rate limiting, CORS, file validation, path traversal guard, privacy cleanup | `server.py` + `test_main.py` |
 | **Computer Vision** | Scout: Gemini vision model → structured Pydantic schema output | `agents/scout.py` |
 | **Testing** | 8 pytest tests — security + parsing edge cases | `test_main.py` |
+
+---
+
+## 📨 Reachable Everywhere — Caspian Multi-Channel Layer
+
+> **A safety system that only works through a dashboard isn't reachable when it matters most.**
+
+AEGIS-SWARM was extended with the **Caspian SDK** to give the same 4-agent consensus pipeline a second identity — one reachable through ordinary communication channels, not just a browser.
+
+### Two Ways In, One Reasoning Engine
+
+| Mode | Trigger | Channels | Handler |
+|---|---|---|---|
+| **Reactive (Field Agent)** | Anyone texts or emails a photo | Telegram + Email | `caspian_handler.py` — single `@client.on_message` handler serves both |
+| **Proactive (Command HQ)** | Dashboard analysis resolves to HIGH/CRITICAL | Telegram + Email | `dispatch_caspian_alert()` in `server.py` — auto-broadcasts the Commander's action plan |
+
+### Reactive Mode — One Handler, Two Channels
+
+```python
+@client.on_message
+def handle(message):
+    # Same function handles Telegram photos AND email attachments —
+    # required by the hackathon rules: duplicating the handler per
+    # channel is not allowed.
+```
+
+Send a photo (or just describe a scene in text) to either channel, and the full Scout → Risk → Critic → Commander debate loop runs identically — same consensus logic as the dashboard, just reachable from a phone.
+
+- **Telegram bot:** [@AEGIS_SWARM_Bot](https://t.me/AEGIS_SWARM_Bot)
+- **Email:** `aegis-swarm-safety-agent-ad9913@agents.trycaspianai.com`
+
+### Proactive Mode — Dashboard-Triggered Broadcast
+
+When the Commander confirms a **HIGH** or **CRITICAL** threat from a dashboard upload, AEGIS-SWARM doesn't wait to be asked — it dispatches the full incident report (threat level, Critic's reasoning, 3-step action plan) directly to a pre-registered Field Operatives Telegram chat and a Command HQ email, the same way a real emergency dispatch system pushes alerts to a registered broadcast list rather than whoever happens to be watching a screen.
+
+*Implementation note: the outbound Email relay uses Caspian's `initiate()` capability; the outbound Telegram relay uses a direct Bot API call for guaranteed low-latency delivery during the dispatch step. The required single-handler, two-channel **inbound** flow (the core hackathon requirement) is fully Caspian SDK-based in `caspian_handler.py`, unchanged.*
+
+### Why This Matters
+
+Most agent demos prove a model can *answer*. AEGIS-SWARM's Caspian layer proves the harder thing: that a **debate-validated decision** can reach the people who need to act on it — automatically, on the channels they already use, without anyone needing to open a dashboard first.
 
 ---
 
@@ -286,8 +367,21 @@ pytest test_main.py -v
 docker build -t aegis-swarm .
 docker run -p 8000:8000 --env-file .env aegis-swarm
 ```
+### 5. Caspian Multi-Channel Agent (Reactive)
 
-### 5. Batch Processing
+```bash
+# Additional .env variables needed:
+# CASPIAN_API_KEY=your_caspian_key
+# TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+# DISPATCH_TELEGRAM_CHAT_ID=your_chat_id
+# DISPATCH_ADMIN_EMAIL=your_email
+
+python caspian_handler.py
+```
+
+> Runs independently from the dashboard backend — connects Telegram and Email once at the account level, then serves both through a single handler.
+> 
+### 6. Batch Processing
 
 ```bash
 # Drop images into test_images/, reports saved to outputs/
