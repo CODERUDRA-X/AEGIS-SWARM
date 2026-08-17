@@ -17,5 +17,5 @@ RUN mkdir -p temp_uploads && chmod 777 temp_uploads
 # Hugging Face Spaces strictly uses port 7860
 EXPOSE 7860
 
-# Command to run the application
+# Command to run the application 
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "7860"]
