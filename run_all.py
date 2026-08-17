@@ -1,6 +1,6 @@
 """
 AEGIS-SWARM :: Batch Processor
-================================
+=================================
 WHY THIS FILE EXISTS:
 Processes an entire directory of drone/CCTV images in sequence,
 saving each result as a structured JSON report. Designed for
