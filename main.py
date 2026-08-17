@@ -1,6 +1,6 @@
 """
 AEGIS-SWARM :: CLI Runner (Local Debug Mode)
-=============================================
+==============================================
 WHY THIS FILE EXISTS:
 server.py exposes the pipeline via HTTP for the Next.js frontend.
 main.py is the local CLI entry point for rapid testing without
