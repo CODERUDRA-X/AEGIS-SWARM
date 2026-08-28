@@ -2,6 +2,7 @@ import os
 import json
 import shutil
 import asyncio
+import sys
 import requests  # <-- ADDED THIS FOR TELEGRAM BYPASS
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -64,9 +65,12 @@ def safe_json_parse(response_text: str, default_fallback: dict) -> dict:
 async def get_telemetry_via_mcp(lat: float = 34.0522, lon: float = -118.2437) -> dict:
     print("📡 [MCP CLIENT] Establishing protocol connection...")
 
+    # 🚀 THE BULLETPROOF FIX: Exact Python interpreter + Exact file path
+    mcp_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcp_server.py")
+
     server_params = StdioServerParameters(
-        command="python",
-        args=["mcp_server.py"],
+        command=sys.executable,  # Tells Docker to use the CORRECT Python environment
+        args=[mcp_script_path],  # Tells Docker the exact location of the file
         env=None
     )
 
