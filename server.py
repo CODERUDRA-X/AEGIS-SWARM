@@ -3,6 +3,7 @@ import json
 import shutil
 import asyncio
 import sys
+import time
 import requests  # <-- ADDED THIS FOR TELEGRAM BYPASS
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -95,6 +96,36 @@ async def get_telemetry_via_mcp(lat: float = 34.0522, lon: float = -118.2437) ->
         return {"source": "OFFLINE", "temperature": "N/A", "wind_speed": "N/A", "mcp_status": "Protocol Failure"}
 
 
+def send_telegram_with_retry(tg_url: str, payload: dict, max_attempts: int = 3) -> requests.Response:
+    """
+    Sends the Telegram dispatch with retries on transient connection
+    failures (confirmed via live deployed logs: SSLEOFError during the
+    TLS handshake, likely a stale/interrupted connection in the
+    container's network stack -- not a code bug, but real enough to
+    fail a live demo if left unhandled).
+
+    Each retry uses `Connection: close` to force a brand-new TCP/TLS
+    connection instead of reusing a potentially-stale one from requests'
+    default connection pool, since connection reuse is the most common
+    cause of this specific SSL EOF error.
+    """
+    last_error = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return requests.post(
+                tg_url,
+                json=payload,
+                timeout=10,
+                headers={"Connection": "close"},  # force a fresh connection each attempt
+            )
+        except requests.exceptions.RequestException as e:
+            last_error = e
+            print(f"   ⚠️ [TG RETRY] Attempt {attempt}/{max_attempts} failed: {e}")
+            if attempt < max_attempts:
+                time.sleep(0.75 * attempt)  # brief backoff: 0.75s, then 1.5s
+    raise last_error
+
+
 def dispatch_caspian_alert(scout_json: dict, final_threat: str, critic_json: dict, commander_json: dict) -> dict:
     status = {"telegram": False, "email": False, "errors": []}
     
@@ -111,14 +142,15 @@ def dispatch_caspian_alert(scout_json: dict, final_threat: str, critic_json: dic
         f"🌐 View Live HQ: https://aegis-swarm-tan.vercel.app/"
     )
 
-    # 1. TELEGRAM (Direct Bypass - Guaranteed Delivery)
+    # 1. TELEGRAM (Direct Bypass - Guaranteed Delivery, now with retry
+    #    on transient SSL/connection failures)
     tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     tg_chat_id = os.environ.get("DISPATCH_TELEGRAM_CHAT_ID")
     
     if tg_token and tg_chat_id:
         try:
             tg_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
-            res = requests.post(tg_url, json={"chat_id": tg_chat_id, "text": alert_msg})
+            res = send_telegram_with_retry(tg_url, {"chat_id": tg_chat_id, "text": alert_msg})
             if res.status_code == 200:
                 status["telegram"] = True
                 print("   ✓ [CASPIAN/TG] Dispatched to Telegram successfully!")
@@ -126,7 +158,7 @@ def dispatch_caspian_alert(scout_json: dict, final_threat: str, critic_json: dic
                 print(f"   ❌ [TG ERROR] Telegram rejected payload: {res.text}")
                 status["errors"].append(f"telegram: {res.text}")
         except Exception as e:
-            print(f"   ❌ [TG ERROR] Request failed: {e}")
+            print(f"   ❌ [TG ERROR] Request failed after retries: {e}")
             status["errors"].append(f"telegram: {e}")
 
     # 2. EMAIL (Real Caspian Initiate Protocol)
