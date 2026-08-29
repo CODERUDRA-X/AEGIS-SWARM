@@ -189,42 +189,29 @@ flowchart LR
     Commander -->|"Structured JSON"| Next
 ```
 
-### 2. Logical Flow & Caspian Emergency Relay
+### 2. Operational Decision & Emergency Communication Flow
 
 ```mermaid
 graph TD
-    Input[Live Feed / Image Upload] --> Orchestrator[FastAPI Orchestration Engine]
+    CMD[Commander Agent: Final Action Plan] --> Decision{Threat Level?}
 
-    Orchestrator -->|Visual Data| Scout[Scout Agent: Vision Extraction]
+    Decision -->|LOW / MEDIUM| Dashboard1[Live Command Dashboard: Decision + Audit Trail]
+    
+    Decision -->|HIGH / CRITICAL| Dashboard2[Live Command Dashboard: Decision + Audit Trail]
+    Dashboard2 --> Relay{Emergency Communication Relay}
 
-    Scout -->|Structured JSON| Risk[Risk Agent: Baseline Evaluation]
-    Scout -->|Structured JSON| Critic[Critic Agent: Challenger]
-
-    External[External APIs / Sensors] <-->|JSON-RPC via stdio| MCP[MCP Server: Live Telemetry]
-    MCP -->|Environmental Context| Critic
-
-    Risk -->|Threat Level| Debate{Consensus Resolution}
-    Critic -->|Adjusted Threat Level| Debate
-
-    Debate -->|Mismatch or Override| Risk
-
-    Debate -->|Consensus Reached| CMD[Commander Agent: Action Plan]
-
-    CMD -->|Threat High or Critical| Caspian{Caspian Emergency Relay}
-
-    Caspian -->|Direct API Bypass| TG[Telegram: Field Operatives]
-    Caspian -->|Official Initiate Protocol| Email[Encrypted Email: Command HQ]
-    CMD -->|Threat Low or Medium| UI[Dashboard: Standby Mode]
+    Relay -->|Emergency Alert| TG[Telegram: Field Operations]
+    Relay -->|Emergency Alert| Email[Email: Command / Coordination]
 
     classDef agent fill:#0a121e,stroke:#58a6ff,stroke-width:2px,color:#e0edf8;
-    classDef caspian fill:#1e0a14,stroke:#ff007f,stroke-width:2px,color:#ff007f;
-    classDef mcp fill:#0a1a1e,stroke:#00d2ff,stroke-width:2px,color:#00d2ff;
-    classDef debate fill:#1e0a0a,stroke:#f85149,stroke-width:2px,color:#f85149;
+    classDef decision fill:#1e0a0a,stroke:#f85149,stroke-width:2px,color:#f85149;
+    classDef relay fill:#1e0a14,stroke:#ff007f,stroke-width:2px,color:#ff007f;
+    classDef ui fill:#0a121e,stroke:#e3b341,stroke-width:2px,color:#e3b341;
 
-    class Scout,Risk,Critic,CMD agent;
-    class Caspian,TG,Email caspian;
-    class MCP mcp;
-    class Debate debate;
+    class CMD agent;
+    class Decision decision;
+    class Relay,TG,Email relay;
+    class Dashboard1,Dashboard2 ui;
 ```
 ---
 
