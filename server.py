@@ -82,20 +82,36 @@ async def get_telemetry_via_mcp(lat: float = 34.0522, lon: float = -118.2437) ->
             async with ClientSession(read, write) as session:
                 await session.initialize()
 
-                result = await session.call_tool(
+                weather_result = await session.call_tool(
                     "get_live_telemetry",
                     arguments={"lat": lat, "lon": lon}
                 )
+                weather_data = (
+                    json.loads(weather_result.content[0].text)
+                    if weather_result.content else {"error": "Empty weather response"}
+                )
 
-                if result.content and len(result.content) > 0:
-                    raw_data = result.content[0].text
-                    return json.loads(raw_data)
+                venue_result = await session.call_tool(
+                    "get_venue_safety_status",
+                    arguments={}
+                )
+                venue_data = (
+                    json.loads(venue_result.content[0].text)
+                    if venue_result.content else {"error": "Empty venue response"}
+                )
 
-                return {"error": "Empty response from MCP tool"}
+                # "evidence" is the PRIMARY independent signal for crowd-crush
+                # risk (occupancy/capacity/exit status). "weather" stays
+                # SECONDARY environmental context -- it must not be treated
+                # as proof of crowd-crush risk on its own.
+                return {"evidence": venue_data, "weather": weather_data}
 
     except Exception as e:
         print(f"❌ [MCP CLIENT] Protocol communication failed: {e}")
-        return {"source": "OFFLINE", "temperature": "N/A", "wind_speed": "N/A", "mcp_status": "Protocol Failure"}
+        return {
+            "evidence": {"mcp_status": "unavailable", "data_source": "N/A"},
+            "weather": {"source": "OFFLINE", "temperature": "N/A", "wind_speed": "N/A", "mcp_status": "Protocol Failure"},
+        }
 
 
 def send_telegram_with_retry(tg_url: str, payload: dict, max_attempts: int = 3) -> requests.Response:
