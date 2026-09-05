@@ -4,6 +4,7 @@ import shutil
 import asyncio
 import sys
 import time
+import base64
 import requests  # <-- ADDED THIS FOR TELEGRAM BYPASS
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -81,36 +82,20 @@ async def get_telemetry_via_mcp(lat: float = 34.0522, lon: float = -118.2437) ->
             async with ClientSession(read, write) as session:
                 await session.initialize()
 
-                weather_result = await session.call_tool(
+                result = await session.call_tool(
                     "get_live_telemetry",
                     arguments={"lat": lat, "lon": lon}
                 )
-                weather_data = (
-                    json.loads(weather_result.content[0].text)
-                    if weather_result.content else {"error": "Empty weather response"}
-                )
 
-                venue_result = await session.call_tool(
-                    "get_venue_safety_status",
-                    arguments={}
-                )
-                venue_data = (
-                    json.loads(venue_result.content[0].text)
-                    if venue_result.content else {"error": "Empty venue response"}
-                )
+                if result.content and len(result.content) > 0:
+                    raw_data = result.content[0].text
+                    return json.loads(raw_data)
 
-                # "evidence" is the PRIMARY independent signal for crowd-crush
-                # risk (occupancy/capacity/exit status). "weather" stays
-                # SECONDARY environmental context -- it must not be treated
-                # as proof of crowd-crush risk on its own.
-                return {"evidence": venue_data, "weather": weather_data}
+                return {"error": "Empty response from MCP tool"}
 
     except Exception as e:
         print(f"❌ [MCP CLIENT] Protocol communication failed: {e}")
-        return {
-            "evidence": {"mcp_status": "unavailable", "data_source": "N/A"},
-            "weather": {"source": "OFFLINE", "temperature": "N/A", "wind_speed": "N/A", "mcp_status": "Protocol Failure"},
-        }
+        return {"source": "OFFLINE", "temperature": "N/A", "wind_speed": "N/A", "mcp_status": "Protocol Failure"}
 
 
 def send_telegram_with_retry(tg_url: str, payload: dict, max_attempts: int = 3) -> requests.Response:
@@ -143,55 +128,108 @@ def send_telegram_with_retry(tg_url: str, payload: dict, max_attempts: int = 3) 
     raise last_error
 
 
+def build_incident_link(scout_json: dict, final_threat: str, critic_json: dict, commander_json: dict, gate_result: dict) -> str:
+    """
+    Builds a shareable link to the EXACT incident that triggered this
+    alert, without needing any database or persistent storage. The
+    incident summary is base64-encoded directly into the URL; the
+    frontend's /incident page decodes and renders it client-side.
+
+    Reasoning text is truncated to keep the URL a reasonable length for
+    email/Telegram link handling -- the full reasoning is already sent
+    in the alert message body itself, so nothing is lost, only the
+    deep-link payload is trimmed.
+
+    gate_result is included so the deep-link page can show the same
+    authorized/blocked decision as the alert message itself, instead of
+    silently implying every dispatched incident had an approved plan.
+    """
+    reasoning = critic_json.get("critic_reasoning", "N/A")
+    if len(reasoning) > 250:
+        reasoning = reasoning[:250] + "..."
+
+    payload = {
+        "scene": scout_json.get("environment_type", "Unknown"),
+        "threat": final_threat,
+        "reasoning": reasoning,
+        "evidence_classification": critic_json.get("evidence_classification", "unavailable"),
+        "gate_decision": gate_result.get("gate_decision"),
+        "actions": (commander_json or {}).get("immediate_actions", []),
+    }
+    encoded = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+    return f"https://aegis-swarm-tan.vercel.app/incident?d={encoded}"
+
+
 def dispatch_caspian_alert(scout_json: dict, final_threat: str, critic_json: dict, commander_json: dict, gate_result: dict) -> dict:
     status = {"telegram": False, "email": False, "errors": []}
 
-    # The alert body reflects what the deterministic safety gate actually
-    # decided -- it must never present a Commander plan as "the action"
-    # when the gate blocked autonomous action. Human responders reading
-    # this alert need to know whether it's an authorized plan or a
-    # review/re-evaluation request.
+    incident_link = build_incident_link(scout_json, final_threat, critic_json, commander_json, gate_result)
+
+    # The alert must reflect what the deterministic gate actually decided --
+    # never present a Commander plan as authorized action when the gate
+    # blocked it. Human responders reading this alert need to know whether
+    # it's an approved plan or a review/re-evaluation request.
     if gate_result.get("commander_authorized") and commander_json:
         actions_text = "\n".join(
-            f"  {i+1}. {act}" for i, act in enumerate(commander_json.get("immediate_actions", []))
+            f"   {i+1}. {act}" for i, act in enumerate(commander_json.get("immediate_actions", []))
         )
-        plan_section = f"Commander Action Plan (GATE-AUTHORIZED):\n{actions_text}"
+        plan_section = f"🛡️ COMMANDER ACTION PLAN (GATE-AUTHORIZED)\n{actions_text}"
     else:
         plan_section = (
-            f"⛔ NO AUTONOMOUS ACTION PLAN GENERATED.\n"
+            f"⛔ NO AUTONOMOUS ACTION PLAN GENERATED\n"
             f"Safety Gate Decision: {gate_result.get('gate_decision', 'UNKNOWN')}\n"
             f"Reason: {gate_result.get('gate_reason', 'N/A')}"
         )
 
     alert_msg = (
         f"🚨 AEGIS-SWARM EMERGENCY ALERT 🚨\n"
-        f"{'='*30}\n"
-        f"Scene: {scout_json.get('environment_type', 'Unknown')}\n"
-        f"Threat Level: {final_threat}\n"
-        f"Critic Reasoning: {critic_json.get('critic_reasoning', 'N/A')}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"THREAT LEVEL: {final_threat}\n\n"
+        f"📍 SCENE\n"
+        f"{scout_json.get('environment_type', 'Unknown')}\n\n"
+        f"⚖️ CRITIC ASSESSMENT\n"
+        f"{critic_json.get('critic_reasoning', 'N/A')}\n"
         f"Evidence Classification: {critic_json.get('evidence_classification', 'unavailable')}\n\n"
         f"{plan_section}\n\n"
-        f"🌐 View Live HQ: https://aegis-swarm-tan.vercel.app/"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🌐 View This Exact Incident: {incident_link}\n"
     )
 
-    # 1. TELEGRAM (Direct Bypass - Guaranteed Delivery, now with retry
-    #    on transient SSL/connection failures)
+    # 1. TELEGRAM — try via Caspian's own gateway first (same proven
+    #    pattern as Email below), since HF Spaces' direct network path
+    #    to api.telegram.org has shown SSL/timeout errors while
+    #    Caspian's gateway reliably reaches both channels. Falls back
+    #    to the direct Bot API bypass (with retry) only if the Caspian
+    #    path itself raises an error.
+    #
+    #    ⚠️ NOTE: connect_telegram() here uses the SAME bot token as
+    #    caspian_handler.py's reactive listener. If that script is
+    #    running at the same time, test carefully -- this may conflict
+    #    with its active connection. Test with caspian_handler.py
+    #    stopped first to confirm this path works in isolation.
     tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     tg_chat_id = os.environ.get("DISPATCH_TELEGRAM_CHAT_ID")
-    
+
     if tg_token and tg_chat_id:
         try:
-            tg_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
-            res = send_telegram_with_retry(tg_url, {"chat_id": tg_chat_id, "text": alert_msg})
-            if res.status_code == 200:
-                status["telegram"] = True
-                print("   ✓ [CASPIAN/TG] Dispatched to Telegram successfully!")
-            else:
-                print(f"   ❌ [TG ERROR] Telegram rejected payload: {res.text}")
-                status["errors"].append(f"telegram: {res.text}")
-        except Exception as e:
-            print(f"   ❌ [TG ERROR] Request failed after retries: {e}")
-            status["errors"].append(f"telegram: {e}")
+            tg_conn = caspian_client.connect_telegram(bot_token=tg_token, capabilities=["INITIATE"])
+            caspian_client.initiate(connection_id=tg_conn["id"], recipient=tg_chat_id, text=alert_msg)
+            status["telegram"] = True
+            print("   ✓ [CASPIAN/TG] Dispatched to Telegram via Caspian gateway!")
+        except Exception as caspian_tg_err:
+            print(f"   ⚠️ [TG] Caspian gateway path failed ({caspian_tg_err}), falling back to direct Bot API...")
+            try:
+                tg_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+                res = send_telegram_with_retry(tg_url, {"chat_id": tg_chat_id, "text": alert_msg})
+                if res.status_code == 200:
+                    status["telegram"] = True
+                    print("   ✓ [CASPIAN/TG] Dispatched to Telegram successfully (direct fallback)!")
+                else:
+                    print(f"   ❌ [TG ERROR] Telegram rejected payload: {res.text}")
+                    status["errors"].append(f"telegram: {res.text}")
+            except Exception as e:
+                print(f"   ❌ [TG ERROR] Both Caspian and direct paths failed: {e}")
+                status["errors"].append(f"telegram: {e}")
 
     # 2. EMAIL (Real Caspian Initiate Protocol)
     admin_email = os.environ.get("DISPATCH_ADMIN_EMAIL")
@@ -282,11 +320,11 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
 
         final_threat = critic_json.get("adjusted_threat_level", "STANDBY")
 
-        # The Commander is an ACTION PLANNER, not the final safety
-        # authority: it is only invoked when the deterministic gate above
-        # has authorized autonomous action. An LLM (Critic or Commander)
-        # can never override this check -- `commander_authorized` comes
-        # from plain if/else logic in agents/safety_gate.py, not a model.
+        # Commander is an ACTION PLANNER, not the final safety authority --
+        # it only runs when the deterministic gate above has authorized
+        # autonomous action. `commander_authorized` comes from plain
+        # if/else logic in agents/safety_gate.py, never from an LLM, so
+        # neither the Critic nor the Commander can override this check.
         commander_json = None
         if gate_result["commander_authorized"]:
             print("🛡️ [API] Gate authorized action — running Commander Agent...")
@@ -296,6 +334,7 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
             print(f"🛑 [API] Gate blocked autonomous action ({gate_result['gate_decision']}). Commander not invoked.")
 
         dispatch_status = None
+
         if final_threat in ["HIGH", "CRITICAL"]:
             print(f"🚀 [CASPIAN] High threat ({final_threat}). Initiating proactive dispatch...")
             dispatch_status = dispatch_caspian_alert(scout_json, final_threat, critic_json, commander_json, gate_result)
@@ -304,8 +343,8 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
             "image": safe_filename,
             "scout_data": scout_json,
             "mcp_data": mcp_data,
-            "risk_assessment": risk_json,          # kept for backward compatibility
-            "initial_assessment": risk_json,       # explicit alias required by safety-gate report spec
+            "risk_assessment": risk_json,
+            "initial_assessment": risk_json,
             "critic_review": critic_json,
             "evidence_classification": critic_json.get("evidence_classification", "unavailable"),
             "safety_gate": gate_result,
