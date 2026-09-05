@@ -25,6 +25,7 @@ from agents.scout import analyze_crowd_frame
 from agents.risk import evaluate_risk
 from agents.critic import challenge_risk_assessment
 from agents.commander import generate_action_plan
+from agents.safety_gate import evaluate_safety_gate
 
 load_dotenv()
 
@@ -80,20 +81,36 @@ async def get_telemetry_via_mcp(lat: float = 34.0522, lon: float = -118.2437) ->
             async with ClientSession(read, write) as session:
                 await session.initialize()
 
-                result = await session.call_tool(
+                weather_result = await session.call_tool(
                     "get_live_telemetry",
                     arguments={"lat": lat, "lon": lon}
                 )
+                weather_data = (
+                    json.loads(weather_result.content[0].text)
+                    if weather_result.content else {"error": "Empty weather response"}
+                )
 
-                if result.content and len(result.content) > 0:
-                    raw_data = result.content[0].text
-                    return json.loads(raw_data)
+                venue_result = await session.call_tool(
+                    "get_venue_safety_status",
+                    arguments={}
+                )
+                venue_data = (
+                    json.loads(venue_result.content[0].text)
+                    if venue_result.content else {"error": "Empty venue response"}
+                )
 
-                return {"error": "Empty response from MCP tool"}
+                # "evidence" is the PRIMARY independent signal for crowd-crush
+                # risk (occupancy/capacity/exit status). "weather" stays
+                # SECONDARY environmental context -- it must not be treated
+                # as proof of crowd-crush risk on its own.
+                return {"evidence": venue_data, "weather": weather_data}
 
     except Exception as e:
         print(f"❌ [MCP CLIENT] Protocol communication failed: {e}")
-        return {"source": "OFFLINE", "temperature": "N/A", "wind_speed": "N/A", "mcp_status": "Protocol Failure"}
+        return {
+            "evidence": {"mcp_status": "unavailable", "data_source": "N/A"},
+            "weather": {"source": "OFFLINE", "temperature": "N/A", "wind_speed": "N/A", "mcp_status": "Protocol Failure"},
+        }
 
 
 def send_telegram_with_retry(tg_url: str, payload: dict, max_attempts: int = 3) -> requests.Response:
@@ -126,19 +143,34 @@ def send_telegram_with_retry(tg_url: str, payload: dict, max_attempts: int = 3) 
     raise last_error
 
 
-def dispatch_caspian_alert(scout_json: dict, final_threat: str, critic_json: dict, commander_json: dict) -> dict:
+def dispatch_caspian_alert(scout_json: dict, final_threat: str, critic_json: dict, commander_json: dict, gate_result: dict) -> dict:
     status = {"telegram": False, "email": False, "errors": []}
-    
-    actions_text = "\n".join(
-        f"  {i+1}. {act}" for i, act in enumerate(commander_json.get("immediate_actions", []))
-    )
+
+    # The alert body reflects what the deterministic safety gate actually
+    # decided -- it must never present a Commander plan as "the action"
+    # when the gate blocked autonomous action. Human responders reading
+    # this alert need to know whether it's an authorized plan or a
+    # review/re-evaluation request.
+    if gate_result.get("commander_authorized") and commander_json:
+        actions_text = "\n".join(
+            f"  {i+1}. {act}" for i, act in enumerate(commander_json.get("immediate_actions", []))
+        )
+        plan_section = f"Commander Action Plan (GATE-AUTHORIZED):\n{actions_text}"
+    else:
+        plan_section = (
+            f"⛔ NO AUTONOMOUS ACTION PLAN GENERATED.\n"
+            f"Safety Gate Decision: {gate_result.get('gate_decision', 'UNKNOWN')}\n"
+            f"Reason: {gate_result.get('gate_reason', 'N/A')}"
+        )
+
     alert_msg = (
         f"🚨 AEGIS-SWARM EMERGENCY ALERT 🚨\n"
         f"{'='*30}\n"
         f"Scene: {scout_json.get('environment_type', 'Unknown')}\n"
         f"Threat Level: {final_threat}\n"
-        f"Critic Reasoning: {critic_json.get('critic_reasoning', 'N/A')}\n\n"
-        f"Commander Action Plan:\n{actions_text}\n\n"
+        f"Critic Reasoning: {critic_json.get('critic_reasoning', 'N/A')}\n"
+        f"Evidence Classification: {critic_json.get('evidence_classification', 'unavailable')}\n\n"
+        f"{plan_section}\n\n"
         f"🌐 View Live HQ: https://aegis-swarm-tan.vercel.app/"
     )
 
@@ -229,7 +261,8 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
             critic_out = challenge_risk_assessment(json.dumps(enriched_context), json.dumps(risk_json))
             critic_json = safe_json_parse(critic_out, {
                 "adjusted_threat_level": risk_json.get("threat_level", "STANDBY"),
-                "critic_reasoning": "Error parsing critic."
+                "critic_reasoning": "Error parsing critic.",
+                "evidence_classification": "unavailable"
             })
 
             current_risk_lvl = risk_json.get("threat_level")
@@ -243,28 +276,45 @@ async def analyze_incident(request: Request, file: UploadFile = File(...)):
                 print("🟢 [DEBATE] Consensus Reached.")
                 consensus_reached = True
 
-        print("🛡️ [API] Running Commander Agent...")
-        plan_out = generate_action_plan(json.dumps(critic_json))
-        commander_json = safe_json_parse(plan_out, {"immediate_actions": ["Review logs.", "", ""]})
+        print("🚧 [API] Evaluating Deterministic Safety Gate...")
+        gate_result = evaluate_safety_gate(critic_json)
+        print(f"   Gate decision: {gate_result['gate_decision']} — {gate_result['gate_reason']}")
 
         final_threat = critic_json.get("adjusted_threat_level", "STANDBY")
+
+        # The Commander is an ACTION PLANNER, not the final safety
+        # authority: it is only invoked when the deterministic gate above
+        # has authorized autonomous action. An LLM (Critic or Commander)
+        # can never override this check -- `commander_authorized` comes
+        # from plain if/else logic in agents/safety_gate.py, not a model.
+        commander_json = None
+        if gate_result["commander_authorized"]:
+            print("🛡️ [API] Gate authorized action — running Commander Agent...")
+            plan_out = generate_action_plan(json.dumps(critic_json))
+            commander_json = safe_json_parse(plan_out, {"immediate_actions": ["Review logs.", "", ""]})
+        else:
+            print(f"🛑 [API] Gate blocked autonomous action ({gate_result['gate_decision']}). Commander not invoked.")
+
         dispatch_status = None
-        
         if final_threat in ["HIGH", "CRITICAL"]:
             print(f"🚀 [CASPIAN] High threat ({final_threat}). Initiating proactive dispatch...")
-            dispatch_status = dispatch_caspian_alert(scout_json, final_threat, critic_json, commander_json)
+            dispatch_status = dispatch_caspian_alert(scout_json, final_threat, critic_json, commander_json, gate_result)
 
         final_report = {
             "image": safe_filename,
             "scout_data": scout_json,
             "mcp_data": mcp_data,
-            "risk_assessment": risk_json,
+            "risk_assessment": risk_json,          # kept for backward compatibility
+            "initial_assessment": risk_json,       # explicit alias required by safety-gate report spec
             "critic_review": critic_json,
+            "evidence_classification": critic_json.get("evidence_classification", "unavailable"),
+            "safety_gate": gate_result,
             "commander_plan": commander_json,
+            "final_decision": gate_result["gate_decision"],
             "dispatch_status": dispatch_status,
         }
 
-        print(f"✅ [API] Analysis complete.")
+        print(f"✅ [API] Analysis complete. Final decision: {gate_result['gate_decision']}")
         return final_report
 
     except Exception as e:
