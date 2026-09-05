@@ -44,6 +44,44 @@ def get_live_telemetry(lat: float = 34.0522, lon: float = -118.2437) -> dict:
     except Exception as e:
         return {"error": f"Malformed response: {e}", "mcp_status": "degraded"}
 
+
+@mcp.tool()
+def get_venue_safety_status(zone_id: str = "default") -> dict:
+    """
+    Fetch venue-side crowd-safety signals (rated capacity, occupancy count,
+    exit availability, active incident flags) for the given zone.
+
+    THIS IS THE PRIMARY INDEPENDENT-EVIDENCE SOURCE for crowd-crush risk --
+    unlike weather, occupancy/capacity/exit-status directly measures the
+    thing the system is trying to assess.
+
+    HONESTY NOTE: No real venue management system (turnstile counters,
+    capacity DB, incident feed) is integrated in this project yet. This
+    function returns clearly-labeled SIMULATED data so the Critic's
+    evidence-handling logic can be built and tested honestly, without
+    pretending a live integration exists. Swap the body of this function
+    for a real API/DB call when a venue system is available; the tool's
+    contract (fields below) does not need to change.
+    """
+    # SIMULATED fixed values -- deterministic, not randomly generated,
+    # so behavior is reproducible in tests/demos. Replace with a real
+    # data source (turnstile API, venue occupancy DB, etc.) for production.
+    simulated_capacity = 500
+    simulated_occupancy = 410
+
+    return {
+        "data_source": "SIMULATED - no live venue system integrated",
+        "zone_id": zone_id,
+        "rated_capacity": simulated_capacity,
+        "current_occupancy": simulated_occupancy,
+        "occupancy_pct": round(simulated_occupancy / simulated_capacity * 100, 1),
+        "exits_available": 2,
+        "exits_total": 3,
+        "active_incident_flag": False,
+        "mcp_status": "Success - SIMULATED venue evidence (not a live feed).",
+    }
+
+
 if __name__ == "__main__":
     # Runs the server using standard input/output transport, which is the 
     # native architecture for MCP communication.
