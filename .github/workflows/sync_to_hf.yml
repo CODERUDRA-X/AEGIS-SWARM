@@ -25,11 +25,28 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git checkout --orphan temp-branch
-          git reset --soft
-          git add server.py requirements.txt Dockerfile mcp_server.py README.md agents/ || true
-          git commit -m "Deploy clean backend"
+          mkdir hf_deploy
+          # Yahan se README.md hata diya hai
+          cp -r server.py requirements.txt Dockerfile mcp_server.py agents/ hf_deploy/
+          
+          cd hf_deploy
+          # HF ke liye zaroori config file yahi bana lenge
+          cat << 'EOF' > README.md
+          ---
+          title: Aegis Swarm Backend
+          emoji: 📊
+          colorFrom: indigo
+          colorTo: yellow
+          sdk: docker
+          pinned: false
+          license: mit
+          ---
+          EOF
+          
+          git init
+          git checkout -b main
+          git add .
+          git commit -m "Deploy clean backend with HF config"
           git remote add hf https://oauth2:${HF_TOKEN}@huggingface.co/spaces/CODERUDRA-X/aegis-swarm-backend
-          git push --force hf temp-branch:main
-
+          git push --force hf main
 
