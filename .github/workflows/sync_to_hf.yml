@@ -1,22 +1,25 @@
 name: Sync to Hugging Face Space
 
-# Syncs to HF on push to main
 on:
   push:
     branches:
       - main
-  # Allows manual trigger
   workflow_dispatch:
 
 jobs:
   sync-to-hub:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout full repo history
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
+
+      - name: Configure Git Identity
+        run: |
+          git config --global user.name "CODERUDRA-X"
+          git config --global user.email "bot@coderudra.xyz"
 
       - name: Push to Hugging Face Space
         env:
