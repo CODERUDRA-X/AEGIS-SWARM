@@ -22,5 +22,5 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git remote add hf https://CODERUDRA-X:${HF_TOKEN}@huggingface.co/spaces/CODERUDRA-X/aegis-swarm-backend
+          git remote add hf https://oauth2:${HF_TOKEN}@huggingface.co/spaces/CODERUDRA-X/aegis-swarm-backend
           git push --force hf HEAD:main
