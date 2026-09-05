@@ -1,0 +1,26 @@
+name: Sync to Hugging Face Space
+
+# Syncs to HF on push to main
+on:
+  push:
+    branches:
+      - main
+  # Allows manual trigger
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full repo history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git remote add hf https://CODERUDRA-X:${HF_TOKEN}@huggingface.co/spaces/CODERUDRA-X/aegis-swarm-backend
+          git push --force hf HEAD:main
