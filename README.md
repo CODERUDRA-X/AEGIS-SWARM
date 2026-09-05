@@ -1,5 +1,5 @@
 <div align="center">
-<h1>⚔️ AEGIS-SWARM</h1>
+<h1>AEGIS-SWARM</h1>
 
 ### The AI That Refuses to Trust Its First Answer.
 
