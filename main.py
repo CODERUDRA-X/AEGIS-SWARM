@@ -24,6 +24,7 @@ from agents.scout import analyze_crowd_frame
 from agents.risk import evaluate_risk
 from agents.critic import challenge_risk_assessment
 from agents.commander import generate_action_plan
+from agents.safety_gate import evaluate_safety_gate
 
 load_dotenv()
 
@@ -107,7 +108,8 @@ def run_aegis_pipeline(image_path: str):
             critic_json = safe_parse(critic_raw, {
                 "agrees_with_risk_level": True,
                 "adjusted_threat_level": risk_json.get("threat_level", "UNKNOWN"),
-                "critic_reasoning": "Parse failure."
+                "critic_reasoning": "Parse failure.",
+                "evidence_classification": "unavailable"
             })
             print(json.dumps(critic_json, indent=2))
         except Exception as e:
@@ -127,17 +129,31 @@ def run_aegis_pipeline(image_path: str):
 
     print("-" * 55)
 
-    # ── STAGE 4: COMMANDER ──────────────────────────────────
-    # Commander receives the FINAL, consensus-validated threat
-    # level from the Critic (not the raw Risk output) to ensure
-    # the action plan reflects the debated, adjusted reality.
-    print("🛡️  [STAGE 4] Commander Agent — Action Plan")
-    try:
-        plan_raw = generate_action_plan(json.dumps(critic_json))
-        plan_json = safe_parse(plan_raw, {"immediate_actions": ["Manual review required."], "personnel_required": True})
-        print(json.dumps(plan_json, indent=2))
-    except Exception as e:
-        print(f"  [ERROR] Commander Agent failed: {e}")
+    # ── STAGE 4: DETERMINISTIC SAFETY GATE ──────────────────
+    # Pure Python, no LLM call. Decides whether the Commander (an LLM)
+    # is even allowed to generate an autonomous action plan, based only
+    # on the Critic's adjusted_threat_level + evidence_classification.
+    print("🚧 [STAGE 4] Deterministic Safety Gate")
+    gate_result = evaluate_safety_gate(critic_json)
+    print(json.dumps(gate_result, indent=2))
+    print("-" * 55)
+
+    # ── STAGE 5: COMMANDER (ACTION PLANNER, NOT FINAL AUTHORITY) ──
+    # Commander only runs if the gate authorized autonomous action.
+    # It receives the FINAL, consensus-validated threat level from the
+    # Critic (not the raw Risk output) so any escalation is reflected.
+    print("🛡️  [STAGE 5] Commander Agent — Action Plan")
+    plan_json = None
+    if gate_result["commander_authorized"]:
+        try:
+            plan_raw = generate_action_plan(json.dumps(critic_json))
+            plan_json = safe_parse(plan_raw, {"immediate_actions": ["Manual review required."], "personnel_required": True})
+            print(json.dumps(plan_json, indent=2))
+        except Exception as e:
+            print(f"  [ERROR] Commander Agent failed: {e}")
+    else:
+        print(f"  ⛔ SKIPPED — Gate decision: {gate_result['gate_decision']}")
+        print(f"  Reason: {gate_result['gate_reason']}")
 
     print(f"\n{'='*55}\n")
 
