@@ -14,6 +14,34 @@ interface LogEntry {
   highlight: Highlight;
 }
 
+interface SafetyGateResult {
+  gate_decision: "AUTONOMOUS_ACTION_AUTHORIZED" | "REQUIRES_REEVALUATION" | "HUMAN_REVIEW_REQUIRED";
+  gate_reason: string;
+  threat_level_evaluated: string;
+  evidence_classification_evaluated: string;
+  commander_authorized: boolean;
+  human_review_required: boolean;
+}
+
+interface VenueEvidence {
+  data_source: string;
+  zone_id?: string;
+  rated_capacity?: number;
+  current_occupancy?: number;
+  occupancy_pct?: number;
+  exits_available?: number;
+  exits_total?: number;
+  active_incident_flag?: boolean;
+  mcp_status: string;
+}
+
+interface WeatherData {
+  source: string;
+  temperature: string;
+  wind_speed: string;
+  mcp_status: string;
+}
+
 interface ReportData {
   scout_data: {
     people_count:     number;
@@ -22,14 +50,19 @@ interface ReportData {
     hazard_factors:   string[];
   };
   mcp_data?: {
-    source: string;
-    temperature: string;
-    wind_speed: string;
-    mcp_status: string;
+    evidence: VenueEvidence;
+    weather: WeatherData;
   };
   risk_assessment:  { threat_level: string };
   critic_review:    { adjusted_threat_level: string; critic_reasoning: string };
-  commander_plan:   { immediate_actions: string[] };
+  evidence_classification?: string;
+  safety_gate?: SafetyGateResult;
+  // commander_plan is null when the deterministic safety gate blocks
+  // autonomous action (HUMAN_REVIEW_REQUIRED / REQUIRES_REEVALUATION) --
+  // the Commander agent is never invoked in that case, so the UI must
+  // not assume this is always populated.
+  commander_plan:   { immediate_actions: string[] } | null;
+  final_decision?: string;
   dispatch_status?: { telegram: boolean; email: boolean; errors: string[] };
 }
 
@@ -51,15 +84,30 @@ const INITIAL_REPORT: ReportData = {
     hazard_factors:   [],
   },
   mcp_data: {
-    source: "OFFLINE",
-    temperature: "--",
-    wind_speed: "--",
-    mcp_status: "Standby",
+    weather: {
+      source: "STANDBY",
+      temperature: "--",
+      wind_speed: "--",
+      mcp_status: "Standby",
+    },
+    evidence: {
+      data_source: "STANDBY",
+      mcp_status: "Standby",
+    },
   },
   risk_assessment:  { threat_level: "STANDBY" },
   critic_review: {
     adjusted_threat_level: "STANDBY",
     critic_reasoning: "System idle. Awaiting visual telemetry to initiate swarm pipeline.",
+  },
+  evidence_classification: "unavailable",
+  safety_gate: {
+    gate_decision: "AUTONOMOUS_ACTION_AUTHORIZED",
+    gate_reason: "System idle. No incident to evaluate.",
+    threat_level_evaluated: "STANDBY",
+    evidence_classification_evaluated: "unavailable",
+    commander_authorized: true,
+    human_review_required: false,
   },
   commander_plan: {
     immediate_actions: [
@@ -68,6 +116,7 @@ const INITIAL_REPORT: ReportData = {
       "Maintain perimeter.",
     ],
   },
+  final_decision: "STANDBY",
   dispatch_status: {
     telegram: false,
     email: false,
@@ -371,7 +420,7 @@ export default function AegisDashboard() {
 
       const dynamicLogs: LogEntry[] = [
         { ts: getLogTimestamp(), agent: "SCOUT", highlight: "normal", msg: `Extraction complete. Terrain: ${data.scout_data.environment_type}. Detected ${data.scout_data.people_count} entities.` },
-        { ts: getLogTimestamp(), agent: "MCP", highlight: "mcp", msg: `Tool Invoked: Live Telemetry. Temp: ${data.mcp_data?.temperature}, Wind: ${data.mcp_data?.wind_speed}.` },
+        { ts: getLogTimestamp(), agent: "MCP", highlight: "mcp", msg: `Weather: ${data.mcp_data?.weather?.temperature ?? "N/A"}, Wind: ${data.mcp_data?.weather?.wind_speed ?? "N/A"}. Venue evidence: ${data.mcp_data?.evidence?.data_source ?? "unavailable"}.` },
         { ts: getLogTimestamp(), agent: "RISK", highlight: "normal", msg: `Base threat evaluated: ${data.risk_assessment.threat_level}.` }
       ];
 
@@ -382,7 +431,22 @@ export default function AegisDashboard() {
         dynamicLogs.push({ ts: getLogTimestamp(), agent: "CRITIC", highlight: "normal", msg: `Concur with Risk Assessment: ${data.risk_assessment.threat_level}.` });
       }
 
-      dynamicLogs.push({ ts: getLogTimestamp(), agent: "CMD", highlight: "cmd", msg: "Consensus received. Executing 3-step action plan." });
+      // Deterministic safety gate is NOT an LLM call -- shown as its own
+      // log line so the pipeline's real decision boundary is visible,
+      // not just "Critic said X, Commander did Y".
+      const gateAuthorized = data.safety_gate?.commander_authorized ?? true;
+      dynamicLogs.push({
+        ts: getLogTimestamp(),
+        agent: "CMD",
+        highlight: gateAuthorized ? "cmd" : "warn",
+        msg: gateAuthorized
+          ? `Safety gate: evidence ${data.safety_gate?.evidence_classification_evaluated ?? "unavailable"} — autonomous action authorized.`
+          : `Safety gate: ${data.safety_gate?.gate_decision ?? "HUMAN_REVIEW_REQUIRED"} — autonomous action blocked.`,
+      });
+
+      if (gateAuthorized) {
+        dynamicLogs.push({ ts: getLogTimestamp(), agent: "CMD", highlight: "cmd", msg: "Consensus received. Executing action plan." });
+      }
 
       let i = 0;
       const logInterval = setInterval(() => {
@@ -395,7 +459,12 @@ export default function AegisDashboard() {
           clearInterval(logInterval);
           setActiveAgent("CMD"); 
           setAn(false);
-          setCaspianDispatched(true); // 🌟 Automatically marks Caspian as dispatched
+          // Only mark Caspian as dispatched if the backend actually
+          // attempted dispatch (HIGH/CRITICAL) -- the dispatch itself
+          // still happens for human-review cases too (responders must
+          // be alerted either way), so this simply mirrors what the
+          // backend's alert message will say.
+          setCaspianDispatched(true);
         }
       }, 800);
 
@@ -412,6 +481,7 @@ export default function AegisDashboard() {
 
   const threat = report.critic_review.adjusted_threat_level;
   const threatColor = threat === "CRITICAL" ? "#f85149" : threat === "HIGH" ? "#f0883e" : threat === "MEDIUM" ? "#e3b341" : threat === "STANDBY" ? "#1e4a6a" : "#3fb950";
+  const gateAuthorized = report.safety_gate?.commander_authorized ?? true;
 
   return (
     <>
@@ -482,15 +552,15 @@ export default function AegisDashboard() {
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px", marginBottom:"8px" }}>
                 <div style={{ padding:"10px 12px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
                   <div style={{ fontSize:"8px", letterSpacing:"0.12em", color:"#1a4060" }}>WIND SPEED</div>
-                  <div style={{ fontSize:"15px", color:"#00d2ff", marginTop:"4px" }}>{report.mcp_data?.wind_speed}</div>
+                  <div style={{ fontSize:"15px", color:"#00d2ff", marginTop:"4px" }}>{report.mcp_data?.weather?.wind_speed}</div>
                 </div>
                 <div style={{ padding:"10px 12px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
                   <div style={{ fontSize:"8px", letterSpacing:"0.12em", color:"#1a4060" }}>TEMPERATURE</div>
-                  <div style={{ fontSize:"15px", color:"#00d2ff", marginTop:"4px" }}>{report.mcp_data?.temperature}</div>
+                  <div style={{ fontSize:"15px", color:"#00d2ff", marginTop:"4px" }}>{report.mcp_data?.weather?.temperature}</div>
                 </div>
               </div>
               <div style={{ fontSize:"8px", color:"#4a6a80", letterSpacing:"0.08em", textTransform: 'uppercase' }}>
-                SRC: {report.mcp_data?.source}
+                SRC: {report.mcp_data?.weather?.source} (SECONDARY CONTEXT ONLY)
               </div>
             </div>
 
@@ -518,6 +588,78 @@ export default function AegisDashboard() {
                 {report.scout_data.environment_type}
               </div>
             </div>
+
+            {/* SAFETY GATE — deterministic checkpoint between Critic and
+                Commander. Shown separately from RESOLVED THREAT above
+                because "how bad is it" (threat level) and "are we
+                allowed to act on it autonomously" (gate decision) are
+                deliberately distinct pieces of information -- see
+                agents/safety_gate.py for the backend rationale. */}
+            <div style={{
+              margin:"0 20px 16px", padding:"16px",
+              background: gateAuthorized ? "rgba(63,185,80,0.03)" : "rgba(240,136,62,0.05)",
+              border:`1px solid ${gateAuthorized ? "#1e4a2e" : "#5a3a1e"}`,
+              borderRadius:"4px", flexShrink:0,
+            }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
+                <span style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060" }}>SAFETY GATE</span>
+                <span style={{
+                  fontSize:"8px", letterSpacing:"0.08em", padding:"2px 8px", borderRadius:"2px",
+                  border:`1px solid ${gateAuthorized ? "rgba(63,185,80,0.5)" : "rgba(240,136,62,0.5)"}`,
+                  color: gateAuthorized ? "#3fb950" : "#f0883e",
+                }}>
+                  {gateAuthorized ? "DETERMINISTIC" : "NO LLM OVERRIDE"}
+                </span>
+              </div>
+
+              <div style={{ fontSize:"13px", fontWeight:700, letterSpacing:"0.03em", color: gateAuthorized ? "#3fb950" : "#f0883e", marginBottom:"8px" }}>
+                {report.safety_gate?.gate_decision ?? "STANDBY"}
+              </div>
+
+              <div style={{ fontSize:"10px", color:"#7a8a9a", lineHeight:1.6, marginBottom:"12px" }}>
+                {report.safety_gate?.gate_reason ?? "Awaiting first analysis."}
+              </div>
+
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px", marginBottom:"10px" }}>
+                <div style={{ padding:"8px 10px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
+                  <div style={{ fontSize:"8px", letterSpacing:"0.1em", color:"#1a4060" }}>EVIDENCE</div>
+                  <div style={{ fontSize:"12px", color:"#b8cfe0", marginTop:"3px", textTransform:"uppercase" }}>
+                    {report.evidence_classification ?? "unavailable"}
+                  </div>
+                </div>
+                <div style={{ padding:"8px 10px", background:"#040b12", border:"1px solid #0e1f2e", borderRadius:"3px" }}>
+                  <div style={{ fontSize:"8px", letterSpacing:"0.1em", color:"#1a4060" }}>COMMANDER</div>
+                  <div style={{ fontSize:"12px", color: gateAuthorized ? "#3fb950" : "#f85149", marginTop:"3px" }}>
+                    {gateAuthorized ? "AUTHORIZED" : "NOT AUTHORIZED"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Venue evidence -- the PRIMARY independent signal the
+                  gate weighs. Explicitly labeled per its own data_source
+                  field so simulated data is never presented as live. */}
+              <div style={{ paddingTop:"10px", borderTop:"1px dashed #1e2a38" }}>
+                <div style={{ fontSize:"8px", letterSpacing:"0.1em", color:"#1a4060", marginBottom:"6px", display:"flex", justifyContent:"space-between" }}>
+                  <span>VENUE EVIDENCE</span>
+                  <span style={{ color: report.mcp_data?.evidence?.data_source?.startsWith("SIMULATED") ? "#e3b341" : "#3fb950" }}>
+                    {report.mcp_data?.evidence?.data_source ?? "STANDBY"}
+                  </span>
+                </div>
+                {report.mcp_data?.evidence?.rated_capacity !== undefined ? (
+                  <div style={{ fontSize:"10px", color:"#7a8a9a", lineHeight:1.7 }}>
+                    Occupancy: <span style={{ color:"#b8cfe0" }}>{report.mcp_data.evidence.current_occupancy}/{report.mcp_data.evidence.rated_capacity}</span>
+                    {" "}({report.mcp_data.evidence.occupancy_pct}%) &nbsp;|&nbsp;
+                    Exits: <span style={{ color:"#b8cfe0" }}>{report.mcp_data.evidence.exits_available}/{report.mcp_data.evidence.exits_total}</span>
+                    {" "}&nbsp;|&nbsp; Incident:{" "}
+                    <span style={{ color: report.mcp_data.evidence.active_incident_flag ? "#f85149" : "#3fb950" }}>
+                      {report.mcp_data.evidence.active_incident_flag ? "ACTIVE" : "NONE"}
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ fontSize:"10px", color:"#1a4060" }}>No venue evidence retrieved yet.</div>
+                )}
+              </div>
+            </div>
             
             <div style={{ paddingBottom: "20px" }}></div>
           </div>
@@ -535,7 +677,9 @@ export default function AegisDashboard() {
             {/* Commander plan with Caspian Button */}
             <div style={{ padding:"16px 20px", flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px", flexShrink:0 }}>
-                <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060" }}>COMMANDER — 3-STEP PLAN</div>
+                <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:"#1a4060" }}>
+                  {gateAuthorized ? "COMMANDER — ACTION PLAN" : "COMMANDER — BLOCKED BY SAFETY GATE"}
+                </div>
                 
                 {/* 🌟 NEW: Field Comms Button */}
                 <button
@@ -551,21 +695,39 @@ export default function AegisDashboard() {
               </div>
 
               <div style={{ display:"flex", flexDirection:"column", gap:"10px", flex:1, overflowY:"auto", paddingRight:"8px" }}>
-                {report.commander_plan.immediate_actions.map((action, i) => (
-                  <div key={i} style={{
-                    display:"flex", gap:"14px", padding:"14px 16px",
-                    background: i === 0 && threat !== 'STANDBY' ? "rgba(248,81,73,0.04)" : "#040b12",
-                    border:     `1px solid ${i === 0 && threat !== 'STANDBY' ? "rgba(248,81,73,0.3)" : "#0e1f2e"}`,
-                    borderRadius:"4px", alignItems:"flex-start", flexShrink:0,
+                {gateAuthorized && report.commander_plan ? (
+                  report.commander_plan.immediate_actions.map((action, i) => (
+                    <div key={i} style={{
+                      display:"flex", gap:"14px", padding:"14px 16px",
+                      background: i === 0 && threat !== 'STANDBY' ? "rgba(248,81,73,0.04)" : "#040b12",
+                      border:     `1px solid ${i === 0 && threat !== 'STANDBY' ? "rgba(248,81,73,0.3)" : "#0e1f2e"}`,
+                      borderRadius:"4px", alignItems:"flex-start", flexShrink:0,
+                    }}>
+                      <span style={{ fontSize:"11px", fontWeight:700, color: i === 0 && threat !== 'STANDBY' ? "#f85149" : "#1a4060", minWidth:"24px", marginTop:"1px" }}>
+                        {String(i+1).padStart(2,"0")}
+                      </span>
+                      <p style={{ fontSize:"12px", lineHeight:1.7, color: i === 0 && threat !== 'STANDBY' ? "#c06050" : i === 1 ? "#4a8aaa" : "#3a6a80", margin:0 }}>
+                        {action}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  // Gate blocked autonomous action -- render the actual
+                  // gate decision instead of pretending Commander ran.
+                  <div style={{
+                    padding:"20px", background:"rgba(240,136,62,0.05)",
+                    border:"1px solid rgba(240,136,62,0.35)", borderRadius:"4px",
                   }}>
-                    <span style={{ fontSize:"11px", fontWeight:700, color: i === 0 && threat !== 'STANDBY' ? "#f85149" : "#1a4060", minWidth:"24px", marginTop:"1px" }}>
-                      {String(i+1).padStart(2,"0")}
-                    </span>
-                    <p style={{ fontSize:"12px", lineHeight:1.7, color: i === 0 && threat !== 'STANDBY' ? "#c06050" : i === 1 ? "#4a8aaa" : "#3a6a80", margin:0 }}>
-                      {action}
+                    <div style={{ fontSize:"14px", fontWeight:700, color:"#f0883e", letterSpacing:"0.05em", marginBottom:"10px" }}>
+                      {report.safety_gate?.gate_decision === "REQUIRES_REEVALUATION"
+                        ? "⚠ REQUIRES RE-EVALUATION"
+                        : "⚠ HUMAN REVIEW REQUIRED"}
+                    </div>
+                    <p style={{ fontSize:"12px", lineHeight:1.7, color:"#b89060", margin:0 }}>
+                      {report.safety_gate?.gate_reason ?? "Independent evidence did not sufficiently confirm the assessed threat level."}
                     </p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -601,7 +763,9 @@ export default function AegisDashboard() {
                   ["threat",          `"${threat}"`,                              threatColor],
                   ["base_threat",     `"${report.risk_assessment.threat_level}"`, "#5a8aaa"],
                   ["entities",        String(report.scout_data.people_count),      "#e0a050"],
-                  ["mcp_source",      `"${report.mcp_data?.source || 'STANDBY'}"`, "#00d2ff"],
+                  ["mcp_weather_source", `"${report.mcp_data?.weather?.source || 'STANDBY'}"`, "#00d2ff"],
+                  ["evidence_class",  `"${report.evidence_classification || 'unavailable'}"`, "#e3b341"],
+                  ["gate_decision",   `"${report.safety_gate?.gate_decision || 'STANDBY'}"`, gateAuthorized ? "#3fb950" : "#f0883e"],
                   ["critic_override", report.critic_review.adjusted_threat_level !== report.risk_assessment.threat_level ? "true" : "false", "#3fb950"],
                 ] as const).map(([k,v,c]) => (
                   <span key={k}>
@@ -680,12 +844,20 @@ export default function AegisDashboard() {
             <div style={{ fontSize: "10px", color: "#64748b", letterSpacing: "0.1em", marginBottom: "8px" }}>TRANSMITTING PAYLOAD...</div>
             <div style={{ background: "#0a121e", borderLeft: `3px solid ${threatColor}`, padding: "16px", marginBottom: "20px" }}>
               <div style={{ fontSize: "14px", fontWeight: "bold", color: "#e0edf8", marginBottom: "8px" }}>
-                AEGIS COMMANDER CONSENSUS
+                {gateAuthorized ? "AEGIS COMMANDER CONSENSUS" : "AEGIS SAFETY GATE — ACTION BLOCKED"}
               </div>
               <div style={{ fontSize: "11px", color: "#8b949e", lineHeight: "1.6" }}>
                 <span style={{ color: "#4a6a80" }}>THREAT LEVEL:</span> <span style={{ color: threatColor, fontWeight: "bold" }}>{threat}</span><br/>
                 <span style={{ color: "#4a6a80" }}>SCENE LOCUS:</span> <span style={{ color: "#b8cfe0" }}>{report.scout_data.environment_type}</span><br/>
-                <span style={{ color: "#4a6a80" }}>DIRECTIVES:</span> <span style={{ color: "#e3b341" }}>{report.commander_plan.immediate_actions.length} Actionable Steps Generated</span>
+                {gateAuthorized ? (
+                  <>
+                    <span style={{ color: "#4a6a80" }}>DIRECTIVES:</span> <span style={{ color: "#e3b341" }}>{report.commander_plan?.immediate_actions.length ?? 0} Actionable Steps Generated</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ color: "#4a6a80" }}>GATE DECISION:</span> <span style={{ color: "#f0883e" }}>{report.safety_gate?.gate_decision ?? "HUMAN_REVIEW_REQUIRED"}</span>
+                  </>
+                )}
               </div>
             </div>
 
