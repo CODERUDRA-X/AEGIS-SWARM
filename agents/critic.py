@@ -62,6 +62,15 @@ class CriticReview(BaseModel):
     agrees_with_risk_level: bool
     adjusted_threat_level: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
     critic_reasoning: str        # Must cite the specific factor driving the decision
+    evidence_classification: Literal["supporting", "contradicting", "insufficient", "unavailable"]
+    # How the independent MCP evidence (occupancy/capacity/exits -- NOT
+    # weather) relates to the Risk Agent's assessment:
+    #   supporting     - evidence backs the current threat level
+    #   contradicting   - evidence conflicts with it (e.g. occupancy near
+    #                      capacity while Risk said LOW, or vice versa)
+    #   insufficient    - evidence exists but doesn't clearly confirm or
+    #                      deny the assessment
+    #   unavailable     - MCP evidence could not be retrieved this cycle
 
 
 def challenge_risk_assessment(scout_json: str, risk_json: str) -> str:
@@ -90,7 +99,19 @@ def challenge_risk_assessment(scout_json: str, risk_json: str) -> str:
     prompt = f"""You are the Critic Agent in a multi-agent crowd safety system.
 Your role is to act as an independent safety auditor -- NOT a rubber stamp.
 
-Raw observational data (Scout output + live environmental telemetry if available):
+Raw observational data (Scout visual output, plus MCP-provided context under
+"live_telemetry" if available). "live_telemetry" contains up to two sub-keys:
+  - "evidence": venue occupancy/capacity/exit-availability data. This is your
+    PRIMARY independent evidence for crowd-crush risk -- it directly measures
+    how full the space is and how much egress capacity exists. If its
+    "data_source" says SIMULATED, treat the numbers as real for this
+    exercise but note in your reasoning that the source is simulated, not a
+    live venue feed.
+  - "weather": temperature/wind. This is SECONDARY environmental context
+    only. Weather alone is NEVER sufficient grounds to raise or lower a
+    threat level -- it can only nudge a decision that is already supported
+    by visual density/hazard data or by the "evidence" occupancy data.
+
 {scout_json}
 
 Risk Agent's current assessment:
@@ -106,16 +127,31 @@ Your task:
      Do not escalate a normal traffic jam just because it looks chaotic.
    - If scene_category is "pedestrian" or "mixed" with real pedestrian presence, apply full
      scrutiny below as normal.
-3. For pedestrian/mixed scenes, pay special attention to:
-   - Environment type: stairs, corridors, and narrow paths dramatically increase
-     crush risk at the SAME density as open areas.
-   - Live telemetry: high wind speed increases risk near elevated or exposed areas.
-     High temperature increases crowd agitation and medical emergency risk.
-   - Hazard factors: each additional hazard factor should push threat level UP,
-     not be averaged away.
-4. If ANY of these pedestrian-relevant factors were under-weighted by the Risk Agent, you MUST
-   elevate the threat level and set agrees_with_risk_level to false.
-5. Provide a specific, evidence-based reason citing the exact factor(s) you are responding to.
+3. For pedestrian/mixed scenes, weigh evidence in this order of authority:
+   a. Occupancy/capacity/exit data in "evidence" (if available): compare
+      occupancy_pct and exits_available/exits_total against the Risk Agent's
+      threat level. High occupancy_pct with few exits available should push
+      the threat level UP even if the visual density looked moderate. Low
+      occupancy_pct with exits available and no active_incident_flag is a
+      reason to NOT escalate further on visuals alone.
+   b. Environment type: stairs, corridors, and narrow paths dramatically increase
+      crush risk at the SAME density as open areas.
+   c. Hazard factors: each additional hazard factor should push threat level UP,
+      not be averaged away.
+   d. Weather (secondary only): high wind speed near elevated/exposed areas, or
+      high temperature increasing crowd agitation/medical risk, can reinforce a
+      conclusion already reached from (a)-(c), but must not drive the decision
+      by itself.
+4. If ANY of the pedestrian-relevant factors above were under-weighted by the Risk Agent, you
+   MUST elevate the threat level and set agrees_with_risk_level to false.
+5. Set evidence_classification based ONLY on the "evidence" (occupancy/capacity/exits) data,
+   not weather:
+   - "supporting" if it backs the (possibly adjusted) threat level
+   - "contradicting" if it conflicts with the Risk Agent's assessment
+   - "insufficient" if it neither clearly confirms nor denies the assessment
+   - "unavailable" if "evidence" is missing or its mcp_status shows failure
+6. Provide a specific, evidence-based reason citing the exact factor(s) you are responding to,
+   distinguishing what came from "evidence" vs. visual data vs. weather.
 
 There is no tier above CRITICAL in this system. If a scene feels more severe than CRITICAL
 already conveys, CRITICAL remains the correct final answer -- put the added severity into
