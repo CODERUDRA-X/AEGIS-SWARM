@@ -17,6 +17,7 @@
 <img src="https://img.shields.io/badge/🧠_REASONING-CONSENSUS_BEFORE_ACTION-E53935?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/📡_PROTOCOL-REAL_MCP_SERVER-FF9800?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/🛡️_TRUST-CRITIC_VALIDATED-43A047?style=for-the-badge&labelColor=0D1117"/>
+<img src="https://img.shields.io/badge/🚧_SAFETY-DETERMINISTIC_GATE-E3B341?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/🔒_SECURITY-PRODUCTION_HARDENED-8B0000?style=for-the-badge&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/☁️_DEPLOY-LIVE_ON_VERCEL_%2B_HF-4285F4?style=for-the-badge&logo=vercel&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/📨_REACHABLE-CASPIAN_TELEGRAM_%2B_EMAIL-EC4899?style=for-the-badge&labelColor=0D1117"/>
@@ -31,9 +32,11 @@
 
 AEGIS-SWARM is a custom-built multi-agent orchestration framework for **consensus-driven crowd safety intelligence**. Built for the *Agents for Good* track — because stampedes kill people, and single-model AI is not enough.
 
-Every recommendation is debated, challenged, validated against a **real MCP protocol server** and live environmental telemetry, then — and only then — executed.
+Every recommendation is debated, challenged, and checked against independent MCP evidence — then passed through a **deterministic, non-LLM safety gate** that decides whether autonomous action is actually authorized, or whether the case must go to human review instead.
 
-> **AEGIS-SWARM isn't an AI that tries to be smarter than other models. It's an engineering system designed to reduce the risk of acting on a single AI's mistake through consensus-driven reasoning, external evidence, and transparent decision validation.**
+> **AEGIS-SWARM isn't an AI that tries to be smarter than other models. It's an engineering system designed to reduce the risk of acting on a single AI's mistake — through consensus-driven reasoning, independent evidence, and a deterministic checkpoint that no LLM can override.**
+
+📝 *Read the backstory: [Why I Didn't Trust a Single AI Agent — Building AEGIS-SWARM](https://coderudra-x.hashnode.dev/why-i-didn-t-trust-a-single-ai-agent-building-aegis-swarm?utm_source=hashnode&utm_medium=feed)*
 ---
 
 ## 🌐 Live Demo
@@ -68,9 +71,11 @@ Instead of one model's first guess, every recommendation is:
 
 - 👁️ **Observed** — Scout extracts spatial facts directly from raw pixels
 - 🧠 **Analyzed** — Risk Agent classifies threat level from structured data
-- ⚔️ **Challenged** — Critic Agent independently contests the assessment using live telemetry
+- 📡 **Verified** — Independent MCP evidence (venue occupancy/exits, weather) is gathered — not just visual guesswork
+- ⚔️ **Challenged** — Critic Agent independently contests the assessment, weighing that evidence, and classifies it as supporting / contradicting / insufficient / unavailable
 - 🔁 **Debated** — If Critic disagrees, Risk re-evaluates with Critic's feedback (iterative loop)
-- 🛡️ **Promoted** — Commander acts only after consensus is reached
+- 🚧 **Gated** — A deterministic, non-LLM Safety Gate checks the threat level against the evidence classification before anything is allowed to act
+- 🛡️ **Promoted or Escalated** — Commander generates an action plan only if the gate authorizes it; otherwise the case is routed to human review or re-evaluation
 
 <div align="center">
 
@@ -80,46 +85,56 @@ Instead of one model's first guess, every recommendation is:
 
 ---
 
-## 🧠 The 4-Agent Cognitive Pipeline
+## 🧠 The Cognitive Pipeline — Scout → Risk → Evidence → Critic → Safety Gate → Commander/Human
 
 ```mermaid
 graph TD
     A["🖼️ Raw Drone/CCTV Image"] -->|Computer Vision| S["👁️ SCOUT AGENT\nVisual Extraction Only"]
     S -->|"JSON: people_count, density,\nblocked_paths, environment_type,\nhazard_factors"| R["⚠️ RISK AGENT\nBaseline Threat Assessment"]
 
-    MCP["🛰️ MCP SERVER\nmcp_server.py · stdio transport\nOpen-Meteo Live API"] -->|"temperature, wind_speed\nvia JSON-RPC protocol"| C["⚖️ CRITIC AGENT\nIndependent Challenger"]
+    MCP["🛰️ MCP SERVER\nmcp_server.py · stdio transport\nget_venue_safety_status (PRIMARY evidence)\nget_live_telemetry (weather, SECONDARY)"] -->|"occupancy/capacity/exits\n+ temperature/wind"| C["⚖️ CRITIC AGENT\nIndependent Challenger"]
 
     R -->|"threat_level: HIGH/CRITICAL/..."| C
 
-    C -->|"agrees_with_risk_level?"| D{"Consensus\nReached?"}
-    D -- "❌ No — Override triggered\nCritic sends reasoning\nback to Risk" --> R
-    D -- "✅ Yes — Max 2 iterations" --> CMD["♞ COMMANDER AGENT\nTactical Action Plan"]
+    C -->|"adjusted_threat_level +\nevidence_classification"| G{"🚧 DETERMINISTIC\nSAFETY GATE\n(pure Python, no LLM)"}
+
+    G -- "❌ Not yet resolved —\nCritic sends reasoning\nback to Risk (max 2x)" --> R
+    G -- "✅ supporting evidence" --> CMD["♞ COMMANDER AGENT\nTactical Action Plan"]
+    G -- "🛑 insufficient/unavailable\n+ HIGH/CRITICAL" --> HR["🧍 HUMAN REVIEW REQUIRED\nCommander NOT invoked"]
+    G -- "⚠️ contradicting evidence" --> RE["🔁 REQUIRES RE-EVALUATION\nCommander NOT invoked"]
 
     CMD -->|"immediate_actions[]\npersonnel_required: bool"| UI["🖥️ Live Command Dashboard\nNext.js Frontend"]
+    HR -->|"gate_reason exposed"| UI
+    RE -->|"gate_reason exposed"| UI
 
     classDef scout fill:#58a6ff,stroke:#58a6ff,stroke-width:2px,color:#fff;
     classDef risk fill:#3fb950,stroke:#3fb950,stroke-width:2px,color:#fff;
     classDef critic fill:#f85149,stroke:#f85149,stroke-width:2px,color:#fff;
+    classDef gate fill:#0d1117,stroke:#e3b341,stroke-width:3px,color:#e3b341;
     classDef cmd fill:#a371f7,stroke:#a371f7,stroke-width:2px,color:#fff;
+    classDef human fill:#1e0a0a,stroke:#f0883e,stroke-width:2px,color:#f0883e;
     classDef mcp fill:#00d2ff,stroke:#00d2ff,stroke-width:2px,color:#000;
     classDef ui fill:#e3b341,stroke:#e3b341,stroke-width:2px,color:#000;
 
     class S scout;
     class R risk;
     class C critic;
+    class G gate;
     class CMD cmd;
+    class HR,RE human;
     class MCP mcp;
     class UI ui;
 ```
 
 ### Agent Roles — Why Each One Exists
 
-| Agent | Role | Why Separate? |
+| Component | Role | Why Separate? |
 |---|---|---|
 | **👁️ Scout** | Visual extraction only — no threat reasoning | Mixing vision + risk in one agent makes reasoning unauditable |
 | **⚠️ Risk** | Baseline threat classification (LOW/MEDIUM/HIGH/CRITICAL) | First-pass assessor with no prior assumptions |
-| **⚖️ Critic** | Independent challenger using live MCP telemetry | Prevents echo-chamber failure — explicitly prompted to disagree |
-| **♞ Commander** | Tactical action plan from consensus-validated data | Acts on Critic's final verdict, not Risk's initial guess |
+| **⚖️ Critic** | Independent challenger using MCP evidence + weather context | Prevents echo-chamber failure — explicitly prompted to disagree, and classifies evidence as supporting/contradicting/insufficient/unavailable |
+| **🚧 Safety Gate** | Deterministic (pure Python, zero LLM calls) authorization check | An LLM's own confidence is never sufficient grounds to authorize autonomous action — this checkpoint cannot be argued with, prompted around, or overridden by any agent |
+| **♞ Commander** | Tactical action plan — **only runs if the gate authorizes it** | Repositioned as an *action planner*, not the final safety authority |
 
 ---
 
@@ -127,7 +142,7 @@ graph TD
 
 > **This is not a labeled REST call. This is actual Model Context Protocol.**
 
-Most "MCP integrations" in hackathon projects are just `requests.get()` with "MCP" written in a comment. AEGIS-SWARM implements the real protocol:
+Most "MCP integrations" in hackathon projects are just `requests.get()` with "MCP" written in a comment. AEGIS-SWARM implements the real protocol — and exposes **two** tools, not one, because weather alone was never good evidence for crowd-crush risk:
 
 ```mermaid
 sequenceDiagram
@@ -138,19 +153,61 @@ sequenceDiagram
     Backend->>MCP: Spawn subprocess (stdio transport)
     Backend->>MCP: JSON-RPC: initialize() handshake
     MCP-->>Backend: Protocol capabilities confirmed
+    Backend->>MCP: call_tool("get_venue_safety_status")
+    MCP-->>Backend: occupancy, capacity, exits_available (PRIMARY evidence)
     Backend->>MCP: call_tool("get_live_telemetry", {lat, lon})
     MCP->>API: HTTP GET /v1/forecast
     API-->>MCP: temperature, wind_speed
     MCP-->>Backend: JSON-RPC TextContent response
-    Backend->>Backend: json.loads(result.content[0].text)
-    Note over Backend: Live telemetry now in Critic Agent context
+    Backend->>Backend: {"evidence": venue_data, "weather": weather_data}
+    Note over Backend: Evidence (PRIMARY) + weather (SECONDARY)\nnow in Critic Agent context
 ```
 
-**`mcp_server.py`** — Standalone FastMCP server, exposed via `stdio` transport, registered tool `get_live_telemetry()` using official `mcp` Python SDK.
+**`mcp_server.py`** — Standalone FastMCP server, exposed via `stdio` transport, registered via official `mcp` Python SDK, with two tools:
 
-**`server.py`** — Acts as MCP client using `ClientSession` + `stdio_client`, performs protocol handshake via `session.initialize()`, calls tool via `session.call_tool()`.
+| Tool | Role | Data |
+|---|---|---|
+| `get_venue_safety_status()` | **Primary independent evidence** for crowd-crush risk | Occupancy, rated capacity, exits available/total, active incident flag |
+| `get_live_telemetry()` | **Secondary** environmental context only — never sufficient on its own | Live temperature/wind from Open-Meteo |
+
+**Honesty about what's real vs. simulated:** `get_live_telemetry()` calls a real live API (Open-Meteo). `get_venue_safety_status()` currently returns clearly-labeled **`SIMULATED`** data (`"data_source": "SIMULATED - no live venue system integrated"`) because no real turnstile/occupancy system is integrated yet — the tool's contract is production-shaped so a real venue API can be dropped in without touching the Critic or the Safety Gate.
+
+**`server.py`** — Acts as MCP client using `ClientSession` + `stdio_client`, performs protocol handshake via `session.initialize()`, calls both tools via `session.call_tool()`, and merges the results into `{"evidence": ..., "weather": ...}` before handing them to the Critic.
 
 This means the telemetry provider is **fully decoupled** — swappable, independently deployable, and reusable by any MCP-compatible host.
+
+---
+
+## 🚧 The Deterministic Safety Gate — No LLM Authorizes Action Alone
+
+> **An LLM's confidence is not evidence. A separate, non-LLM checkpoint decides whether autonomous action is actually allowed.**
+
+Before the gate existed, the Critic (an LLM) could produce a threat level and the very next step (Commander, another LLM) would immediately turn it into an "actionable" plan — including a real Telegram/email dispatch for HIGH/CRITICAL. Nothing checked whether independent evidence actually backed that threat level first.
+
+`agents/safety_gate.py` is **plain Python — no prompt, no model call, no network access.** It reads only two fields the Critic already produced (`adjusted_threat_level`, `evidence_classification`) and applies fixed rules:
+
+| Evidence Classification | Threat Level | Gate Decision | Commander Runs? |
+|---|---|---|---|
+| `supporting` | any | `AUTONOMOUS_ACTION_AUTHORIZED` | ✅ Yes |
+| `insufficient` / `unavailable` | LOW / MEDIUM | `AUTONOMOUS_ACTION_AUTHORIZED` *(gap logged)* | ✅ Yes |
+| `insufficient` / `unavailable` | **HIGH / CRITICAL** | `HUMAN_REVIEW_REQUIRED` | ❌ **No — fails closed** |
+| `contradicting` | any | `REQUIRES_REEVALUATION` | ❌ No |
+
+The **fail-closed rule** is the core of the design: for genuinely high-stakes situations, the system refuses to let an LLM-authored action plan go out the door on visual reasoning alone when the independent evidence channel couldn't confirm it — it does not pretend confidence it doesn't have.
+
+In code, this is enforced as literal control flow, not a label:
+
+```python
+gate_result = evaluate_safety_gate(critic_json)
+
+commander_json = None
+if gate_result["commander_authorized"]:      # plain bool, from if/else logic only
+    plan_out = generate_action_plan(json.dumps(critic_json))
+    commander_json = safe_json_parse(plan_out, {...})
+# else: Commander is never called. No exceptions, no LLM override path.
+```
+
+Every final report exposes the full trail: initial assessment → MCP evidence → Critic's challenge → evidence classification → gate decision + reason → final authorized action **or** human-review/re-evaluation decision.
 
 ---
 
@@ -193,22 +250,32 @@ flowchart LR
 
 ```mermaid
 graph TD
-    CMD[Commander Agent: Final Action Plan] --> Decision{Threat Level?}
+    GATE[Safety Gate: Decision] --> Auth{Authorized?}
+
+    Auth -->|"✅ AUTONOMOUS_ACTION_AUTHORIZED"| CMD[Commander: Action Plan Generated]
+    Auth -->|"🛑 HUMAN_REVIEW_REQUIRED / 🔁 REQUIRES_REEVALUATION"| Blocked[Commander NOT Invoked]
+
+    CMD --> Decision{Threat Level?}
+    Blocked --> Decision
 
     Decision -->|LOW / MEDIUM| Dashboard1[Live Command Dashboard: Decision + Audit Trail]
-    
+
     Decision -->|HIGH / CRITICAL| Dashboard2[Live Command Dashboard: Decision + Audit Trail]
     Dashboard2 --> Relay{Emergency Communication Relay}
 
-    Relay -->|Emergency Alert| TG[Telegram: Field Operations]
-    Relay -->|Emergency Alert| Email[Email: Command / Coordination]
+    Relay -->|"Action Plan (if authorized)\nor Gate Reason (if blocked)"| TG[Telegram: Field Operations]
+    Relay -->|"Action Plan (if authorized)\nor Gate Reason (if blocked)"| Email[Email: Command / Coordination]
 
     classDef agent fill:#0a121e,stroke:#58a6ff,stroke-width:2px,color:#e0edf8;
+    classDef gate fill:#0d1117,stroke:#e3b341,stroke-width:3px,color:#e3b341;
+    classDef blocked fill:#1e0a0a,stroke:#f0883e,stroke-width:2px,color:#f0883e;
     classDef decision fill:#1e0a0a,stroke:#f85149,stroke-width:2px,color:#f85149;
     classDef relay fill:#1e0a14,stroke:#ff007f,stroke-width:2px,color:#ff007f;
     classDef ui fill:#0a121e,stroke:#e3b341,stroke-width:2px,color:#e3b341;
 
+    class GATE,Auth gate;
     class CMD agent;
+    class Blocked blocked;
     class Decision decision;
     class Relay,TG,Email relay;
     class Dashboard1,Dashboard2 ui;
@@ -249,21 +316,24 @@ Iteration 2 (with Critic's reasoning injected into Risk's context):
 
 - **Max 2 iterations** — prevents infinite cycling
 - **Critic feedback injected** as `critic_override_reasoning` into Risk's next prompt
-- **Commander only receives** the final consensus output — never an intermediate draft
+- **Commander never receives raw debate output** — the consensus-final `critic_json` goes to the Safety Gate first; Commander only sees it at all if the gate authorizes action
 
 ---
 
-## 🏆 Caspian AI Hackathon Rubric Fulfillment
+## ✅ Engineering Checklist — What's Actually Implemented
 
 | Concept | Implementation | Evidence |
 |---|---|---|
-| **Multi-Agent System** | 4-agent topology with iterative consensus debate loop | `server.py` — `while iteration < MAX_ITERATIONS` |
-| **Caspian SDK Integration** | Proactive emergency dispatch and multi-channel relay (Telegram & Email) | `server.py` (`dispatch_caspian_alert`) & `caspian_handler.py` |
+| **Multi-Agent System** | 4-stage pipeline with iterative consensus debate loop | `server.py` — `while iteration < MAX_ITERATIONS` |
+| **Deterministic Safety Gate** | Pure-Python authorization check between Critic and Commander — fail-closed for HIGH/CRITICAL + weak evidence | `agents/safety_gate.py` — `evaluate_safety_gate()` |
+| **Independent MCP Evidence** | Two real MCP tools — venue occupancy (primary) + weather (secondary, honestly labeled where simulated) | `mcp_server.py` — `get_venue_safety_status()`, `get_live_telemetry()` |
+| **Caspian SDK Integration** | Proactive emergency dispatch, multi-channel relay (Telegram & Email) with Caspian-routed fallback | `server.py` (`dispatch_caspian_alert`) & `caspian_handler.py` |
 | **Real MCP Server** | `mcp_server.py` — FastMCP, `@mcp.tool()`, `stdio` transport, JSON-RPC | `mcp_server.py` + `get_telemetry_via_mcp()` in `server.py` |
+| **Incident Deep-Linking** | Stateless, database-free incident reports encoded directly into alert links | `build_incident_link()` in `server.py` + `aegis-frontend/app/incident/page.tsx` |
 | **Deployability** | Live on Vercel + Hugging Face Docker Spaces | [aegis-swarm-tan.vercel.app](https://aegis-swarm-tan.vercel.app) |
 | **Security Features** | Rate limiting, CORS, file validation, path traversal guard, privacy cleanup | `server.py` + `test_main.py` |
 | **Computer Vision** | Scout: Gemini vision model → structured Pydantic schema output | `agents/scout.py` |
-| **Testing** | 8 pytest tests — security + parsing edge cases | `test_main.py` |
+| **Testing** | pytest coverage — security + parsing edge cases | `test_main.py` |
 
 ---
 
@@ -297,9 +367,16 @@ Send a photo (or just describe a scene in text) to either channel, and the full 
 
 ### Proactive Mode — Dashboard-Triggered Broadcast
 
-When the Commander confirms a **HIGH** or **CRITICAL** threat from a dashboard upload, AEGIS-SWARM doesn't wait to be asked — it dispatches the full incident report (threat level, Critic's reasoning, 3-step action plan) directly to a pre-registered Field Operatives Telegram chat and a Command HQ email, the same way a real emergency dispatch system pushes alerts to a registered broadcast list rather than whoever happens to be watching a screen.
+When a **HIGH** or **CRITICAL** threat comes out of the debate loop, AEGIS-SWARM doesn't wait to be asked — it dispatches a full incident report directly to a pre-registered Field Operatives Telegram chat and a Command HQ email, the same way a real emergency dispatch system pushes alerts to a registered broadcast list rather than whoever happens to be watching a screen.
 
-*Implementation note: the outbound Email relay uses Caspian's `initiate()` capability; the outbound Telegram relay uses a direct Bot API call for guaranteed low-latency delivery during the dispatch step. The required single-handler, two-channel **inbound** flow (the core hackathon requirement) is fully Caspian SDK-based in `caspian_handler.py`, unchanged.*
+The alert always reflects what the **Safety Gate** actually decided — never a Commander plan presented as authorized when it wasn't:
+
+- **Gate authorized** → alert includes the Commander's numbered action plan (`GATE-AUTHORIZED`)
+- **Gate blocked** (`HUMAN_REVIEW_REQUIRED` / `REQUIRES_REEVALUATION`) → alert clearly states *"NO AUTONOMOUS ACTION PLAN GENERATED"* along with the gate's reasoning — a responder is never told an action was taken when it wasn't
+
+Each alert also carries a **stateless incident deep-link** (`aegis-swarm-tan.vercel.app/incident?d=<base64>`) — the exact scene, threat level, evidence classification, and gate decision are encoded directly into the URL, so clicking it renders that specific incident, not just the generic homepage, with zero database required.
+
+*Implementation note: the outbound Email relay uses Caspian's `initiate()` capability; the outbound Telegram relay tries the Caspian gateway first and falls back to a direct Bot API call (with retry) if that path fails. The required single-handler, two-channel **inbound** flow (the core hackathon requirement) is fully Caspian SDK-based in `caspian_handler.py`, unchanged.*
 
 ### Why This Matters
 
@@ -384,16 +461,20 @@ AEGIS-SWARM/
 ├── agents/
 │   ├── scout.py          # Visual extraction + privacy cleanup
 │   ├── risk.py           # Baseline threat classification
-│   ├── critic.py         # Independent challenger
-│   └── commander.py      # Tactical action planner
-├── mcp_server.py         # Real MCP server (FastMCP, stdio transport)
-├── server.py             # FastAPI orchestrator + MCP client
-├── main.py               # CLI runner (local debug)
+│   ├── critic.py         # Independent challenger + evidence classification
+│   ├── commander.py      # Tactical action planner (gate-gated, not final authority)
+│   └── safety_gate.py    # Deterministic authorization checkpoint (pure Python, no LLM)
+├── mcp_server.py         # Real MCP server — venue evidence + weather tools (stdio transport)
+├── server.py             # FastAPI orchestrator + MCP client + safety gate wiring
+├── main.py               # CLI runner (local debug, mirrors the gated server.py flow)
 ├── run_all.py            # Batch image processor
-├── test_main.py          # 8 pytest security + unit tests
+├── test_main.py          # pytest security + unit tests
 ├── Dockerfile            # Production container config
 ├── requirements.txt      # All dependencies including mcp SDK
 └── aegis-frontend/       # Next.js command dashboard
+    └── app/
+        └── incident/
+            └── page.tsx  # Stateless incident deep-link renderer (no database)
 ```
 
 ---
