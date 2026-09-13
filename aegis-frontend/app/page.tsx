@@ -865,8 +865,13 @@ export default function AegisDashboard() {
             <div style={{ fontSize: "11px", color: "#b8cfe0", display: "flex", flexDirection: "column", gap: "8px" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>[►] Routing to CH-01 (Telegram)...</span>
-                {/* Dynamic TG status */}
-                {report.dispatch_status?.telegram ? (
+                {/* dispatch_status is entirely null/undefined when the
+                    backend never attempted dispatch (threat was
+                    LOW/MEDIUM) -- that's NOT the same as an attempted
+                    dispatch that failed, so it needs its own state. */}
+                {!report.dispatch_status ? (
+                  <span style={{ color: "#4a6a80" }}>NOT DISPATCHED (threat below HIGH)</span>
+                ) : report.dispatch_status.telegram ? (
                   <span style={{ color: "#3fb950", fontWeight: "bold" }}>DELIVERED ✓</span>
                 ) : (
                   <span style={{ color: "#f85149", fontWeight: "bold" }}>FAILED ❌</span>
@@ -874,8 +879,9 @@ export default function AegisDashboard() {
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>[►] Routing to CH-02 (HQ Email)...</span>
-                {/* Dynamic Email status */}
-                {report.dispatch_status?.email ? (
+                {!report.dispatch_status ? (
+                  <span style={{ color: "#4a6a80" }}>NOT DISPATCHED (threat below HIGH)</span>
+                ) : report.dispatch_status.email ? (
                   <span style={{ color: "#3fb950", fontWeight: "bold" }}>DELIVERED ✓</span>
                 ) : (
                   <span style={{ color: "#f85149", fontWeight: "bold" }}>FAILED ❌</span>
