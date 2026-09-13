@@ -247,17 +247,25 @@ def dispatch_caspian_alert(scout_json: dict, final_threat: str, critic_json: dic
                 print(f"   ❌ [TG ERROR] Both Caspian and direct paths failed: {e}")
                 status["errors"].append(f"telegram: {e}")
 
-    # 2. EMAIL (Real Caspian Initiate Protocol)
+        # 2. EMAIL (Real Caspian Initiate Protocol) — now sends to multiple
+    # recipients (admin + hackathon organizer) so both can see live dispatches.
     admin_email = os.environ.get("DISPATCH_ADMIN_EMAIL")
-    if admin_email:
+    organizer_email = os.environ.get("DISPATCH_ORGANIZER_EMAIL")
+    recipients = [e for e in [admin_email, organizer_email] if e]
+
+    if recipients:
         try:
-            # Connect and request INITIATE capability
             email_conn = caspian_client.connect_email(display_name="AEGIS HQ", capabilities=["INITIATE"])
-            
-            # Send the actual email payload
-            caspian_client.initiate(connection_id=email_conn["id"], recipient=admin_email, text=alert_msg)
-            status["email"] = True
-            print("   ✓ [CASPIAN/HQ] Actual Email Dispatched via Caspian!")
+            delivered_count = 0
+            for recipient in recipients:
+                try:
+                    caspian_client.initiate(connection_id=email_conn["id"], recipient=recipient, text=alert_msg)
+                    delivered_count += 1
+                    print(f"   ✓ [CASPIAN/HQ] Email dispatched to {recipient}")
+                except Exception as e:
+                    print(f"   ❌ [EMAIL ERROR] Failed to reach {recipient}: {e}")
+                    status["errors"].append(f"email to {recipient}: {e}")
+            status["email"] = delivered_count > 0
         except Exception as e:
             print(f"   ❌ [EMAIL ERROR] Caspian server failed: {e}")
             status["errors"].append(f"email: {e}")
