@@ -22,7 +22,37 @@
 <img src="https://img.shields.io/badge/☁️_DEPLOY-LIVE_ON_VERCEL_%2B_HF-4285F4?style=for-the-badge&logo=vercel&labelColor=0D1117"/>
 <img src="https://img.shields.io/badge/📨_REACHABLE-CASPIAN_TELEGRAM_%2B_EMAIL-EC4899?style=for-the-badge&labelColor=0D1117"/>
 
+
 </p>
+
+
+<!-- 🏆 AEGIS-SWARM | GLOBAL RECOGNITION -->
+<p align="center">
+  <img
+    src="https://img.shields.io/badge/%E2%98%85_GLOBAL_MILESTONE-REDDIT_%232-C9A227?style=for-the-badge&labelColor=171717"
+    alt="Global Milestone — Reddit Trending #2"
+  />
+</p>
+
+<p align="center">
+  <img
+    src="https://github.com/CODERUDRA-X/AEGIS-SWARM/blob/main/assets/IMG_20261013_222300.jpg?raw=true"
+    alt="AEGIS-SWARM — Reddit Trending #2 Recognition"
+    width="92%"
+  />
+</p>
+
+<p align="center">
+  <strong>🏆 &nbsp; #2 TRENDING ON r/machinelearningnews</strong>
+  <br/><br/>
+  <sub>
+    <strong>20 HOURS.</strong> One release. Global community recognition.
+  </sub>
+  <br/>
+  <sub>━━━━━━━━━━━━━━━━ ◆ ━━━━━━━━━━━━━━━━</sub>
+</p>
+
+
 
 <p align="center">
 <img src="https://github.com/CODERUDRA-X/AEGIS-SWARM/blob/main/assets/demo.gif?raw=true" width="100%">
