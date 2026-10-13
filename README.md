@@ -46,7 +46,7 @@
   <strong>🏆 &nbsp; #2 TRENDING ON r/machinelearningnews</strong>
   <br/><br/>
   <sub>
-    <strong>20 HOURS.</strong> One release. Global community recognition.
+    <strong>Within 20 HOURS.</strong> One release. Global community recognition.
   </sub>
   <br/>
   <sub>━━━━━━━━━━━━━━━━ ◆ ━━━━━━━━━━━━━━━━</sub>
