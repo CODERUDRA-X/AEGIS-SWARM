@@ -311,6 +311,30 @@ graph TD
     class Dashboard1,Dashboard2 ui;
 ```
 ---
+<p align="center">
+  <img
+    src="./assets/recognition-achievements-gold-badge.svg"
+    alt="Recognition & Achievements"
+    width="500"
+  />
+</p>
+<p align="center">
+  <strong>Competitive milestones · Hackathon recognition · Community traction</strong>
+</p>
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="./assets/hackday-rank-10-updated.svg" alt="HACKDAY 1.0 — Rank 10" width="100%">
+    </td>
+    <td align="center" width="33%">
+      <img src="./assets/techzephyr-round-2-finalist.svg" alt="TechZephyr 4.0 — Round 2 Finalist" width="100%">
+    </td>
+    <td align="center" width="33%">
+      <img src="./assets/google-kaggle-capstone-clean.svg" alt="Google × Kaggle AI Agents Intensive — Capstone Project" width="100%">
+    </td>
+  </tr>
+</table>
 
 ## 🔒 Security Architecture
 
