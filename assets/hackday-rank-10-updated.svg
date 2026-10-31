@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="190" viewBox="0 0 420 190" role="img" aria-labelledby="title desc">
+<title id="title">HACKDAY 1.0 — Rank 10</title><desc id="desc">Gold achievement medallion for rank 10 among 1,750 plus project submissions.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#17191f"/><stop offset="1" stop-color="#0b0d12"/></linearGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff0a6"/><stop offset=".35" stop-color="#e5bd52"/><stop offset=".7" stop-color="#b9821d"/><stop offset="1" stop-color="#f7dc83"/></linearGradient>
+  <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8c55d"/><stop offset="1" stop-color="#9f6c13"/></linearGradient>
+</defs>
+<rect x="1" y="1" width="418" height="188" rx="15" fill="url(#bg)" stroke="#8d6b25" stroke-width="1.5"/>
+<path d="M15 43 H405" stroke="#3d3421"/>
+<g transform="translate(82 88)">
+  <path d="M-24 -45 L-8 -18 L-22 6 L-43 -37 Z" fill="url(#ribbon)" stroke="#f5d778"/>
+  <path d="M24 -45 L8 -18 L22 6 L43 -37 Z" fill="#8c1828" stroke="#f5d778"/>
+  <circle r="43" fill="#292114" stroke="url(#gold)" stroke-width="4"/>
+  <circle r="35" fill="none" stroke="#b88a2b" stroke-width="1.5" stroke-dasharray="2 4"/>
+  <path d="M0 -23 L6 -7 L23 -7 L9 3 L14 20 L0 10 L-14 20 L-9 3 L-23 -7 L-6 -7 Z" fill="url(#gold)"/>
+  <text x="0" y="7" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" text-anchor="middle" fill="#21190a">★</text>
+</g>
+<g font-family="Arial, Helvetica, sans-serif" fill="#f5f1e6">
+  <text x="145" y="31" font-size="12" font-weight="700" letter-spacing="2" fill="#e4c15c">COMPETITIVE ACHIEVEMENT</text>
+  <text x="145" y="72" font-size="13" font-weight="700" letter-spacing="1.3" fill="#c6a348">HACKDAY 1.0</text>
+  <text x="145" y="112" font-size="35" font-weight="800" fill="url(#gold)">RANK #10</text>
+  <text x="145" y="137" font-size="12" fill="#c7c9d0">Among 1,750+ Agentic AI Projects Nationwide</text>
+  <text x="145" y="163" font-size="10" letter-spacing="1.5" fill="#888d98">AEGIS-SWARM</text>
+</g>
+</svg>
